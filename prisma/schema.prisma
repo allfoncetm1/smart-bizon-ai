@@ -1,0 +1,184 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  bizonId     String   @unique
+  apiToken    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  webinars      Webinar[]
+  leads         Lead[]
+  agentConfig   AgentConfig?
+  linkRedirects LinkRedirect[]
+}
+
+model Webinar {
+  id            String        @id @default(cuid())
+  bizonId       String        @unique
+  projectId     String
+  title         String
+  type          WebinarType
+  status        WebinarStatus @default(PENDING)
+  startedAt     DateTime?
+  endedAt       DateTime?
+  duration      Int?
+  viewersCount  Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  project       Project       @relation(fields: [projectId], references: [id])
+  participants  Participant[]
+  chatMessages  ChatMessage[]
+  analytics     WebinarAnalytics?
+}
+
+model Participant {
+  id              String      @id @default(cuid())
+  webinarId       String
+  email           String
+  name            String?
+  phone           String?
+  ip              String?
+  country         String?
+  city            String?
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  timeOnWebinar   Int         @default(0)
+  clickedButtons  Json?
+  viewedBanners   Json?
+  segment         LeadSegment @default(COLD)
+  score           Int         @default(0)
+  createdAt       DateTime    @default(now())
+
+  webinar         Webinar     @relation(fields: [webinarId], references: [id])
+
+  @@unique([email, webinarId])
+}
+
+model Lead {
+  id           String      @id @default(cuid())
+  projectId    String
+  webinarId    String
+  email        String
+  name         String?
+  phone        String?
+  segment      LeadSegment @default(COLD)
+  score        Int         @default(0)
+  notes        String?
+  hasPurchased Boolean     @default(false)
+  crmSynced    Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  project      Project     @relation(fields: [projectId], references: [id])
+
+  @@unique([email, webinarId])
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  webinarId   String
+  senderEmail String?
+  senderName  String?
+  text        String
+  sentAt      DateTime
+  isSpam      Boolean  @default(false)
+  isToxic     Boolean  @default(false)
+  isQuestion  Boolean  @default(false)
+  aiAnswer    String?
+  createdAt   DateTime @default(now())
+
+  webinar     Webinar  @relation(fields: [webinarId], references: [id])
+}
+
+model WebinarAnalytics {
+  id                String   @id @default(cuid())
+  webinarId         String   @unique
+  totalViewers      Int      @default(0)
+  avgTimeOnWebinar  Int      @default(0)
+  chatMessagesCount Int      @default(0)
+  spamCount         Int      @default(0)
+  questionsCount    Int      @default(0)
+  hotLeadsCount     Int      @default(0)
+  warmLeadsCount    Int      @default(0)
+  coldLeadsCount    Int      @default(0)
+  purchasesCount    Int      @default(0)
+  conversionRate    Float    @default(0)
+  peakViewers       Int      @default(0)
+  summary           String?
+  createdAt         DateTime @default(now())
+
+  webinar           Webinar  @relation(fields: [webinarId], references: [id])
+}
+
+model LinkRedirect {
+  id             String   @id @default(cuid())
+  projectId      String
+  slug           String   @unique
+  destinationUrl String
+  ogTitle        String?
+  ogDescription  String?
+  ogImageUrl     String?
+  clicks         Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model AgentConfig {
+  id                 String   @id @default(cuid())
+  projectId          String   @unique
+  isActive           Boolean  @default(true)
+  moderationEnabled  Boolean  @default(true)
+  filterSpam         Boolean  @default(true)
+  filterMat          Boolean  @default(true)
+  filterToxic        Boolean  @default(true)
+  customBanWords     String[] @default([])
+  autoAnswersEnabled Boolean  @default(true)
+  autoAnswerDelay    Int      @default(5)
+  customFaq          Json?
+  hotScoreThreshold  Int      @default(70)
+  warmScoreThreshold Int      @default(40)
+  telegramEnabled    Boolean  @default(false)
+  telegramChatId     String?
+  notifyOnHotLead    Boolean  @default(true)
+  notifyOnPurchase   Boolean  @default(true)
+  productDescription String?
+  targetAudience     String?
+  salesScript        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  project            Project  @relation(fields: [projectId], references: [id])
+}
+
+enum WebinarType {
+  LIVE
+  AUTO
+}
+
+enum WebinarStatus {
+  PENDING
+  PROCESSING
+  DONE
+  ERROR
+}
+
+enum LeadSegment {
+  HOT
+  WARM
+  COLD
+  PURCHASED
+}
