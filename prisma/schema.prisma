@@ -121,6 +121,20 @@ model WebinarAnalytics {
   webinar           Webinar  @relation(fields: [webinarId], references: [id])
 }
 
+model User {
+  id          String    @id @default(cuid())
+  telegramId  String    @unique
+  username    String?
+  firstName   String?
+  lastName    String?
+  photoUrl    String?
+  isAdmin     Boolean   @default(false)
+  hasAccess   Boolean   @default(false)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
 model LinkRedirect {
   id             String   @id @default(cuid())
   projectId      String
