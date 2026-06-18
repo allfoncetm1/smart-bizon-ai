@@ -35,8 +35,12 @@ yarn-error.log*
 .env.local
 .env.*.local
 
-# vercel
+# vercel / render
 .vercel
+vercel.json
+dev.log
+CLAUDE.md
+AGENTS.md
 
 # typescript
 *.tsbuildinfo

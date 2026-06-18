@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Link2, Copy, Trash2, Plus, ExternalLink, ToggleLeft, ToggleRight, Eye, Pencil, X, Check } from "lucide-react";
+import { Link2, Copy, Trash2, Plus, ExternalLink, ToggleLeft, ToggleRight, Eye, Pencil, X, Check, Upload } from "lucide-react";
 
 interface LinkRedirect {
   id: string;
@@ -21,6 +21,8 @@ const EMPTY_FORM = {
   ogTitle: "",
   ogDescription: "",
   ogImageUrl: "",
+  ogImageBlob: "",
+  ogImageMime: "",
 };
 
 function randomSlug() {
@@ -71,6 +73,8 @@ export default function RedirectsPage() {
       ogTitle: link.ogTitle ?? "",
       ogDescription: link.ogDescription ?? "",
       ogImageUrl: link.ogImageUrl ?? "",
+      ogImageBlob: "",
+      ogImageMime: "",
     });
     setEditId(link.id);
     setError("");
@@ -224,26 +228,58 @@ export default function RedirectsPage() {
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-400 mb-1.5 block">URL баннера (изображение для превью)</label>
-                <input
-                  value={form.ogImageUrl}
-                  onChange={(e) => setForm((f) => ({ ...f, ogImageUrl: e.target.value }))}
-                  placeholder="https://example.com/banner.jpg (мин. 800×418px)"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
-                />
+                <label className="text-xs text-gray-400 mb-1.5 block">Баннер (изображение для превью)</label>
+                <div className="space-y-2">
+                  <input
+                    value={form.ogImageBlob ? "" : form.ogImageUrl}
+                    onChange={(e) => setForm((f) => ({ ...f, ogImageUrl: e.target.value, ogImageBlob: "", ogImageMime: "" }))}
+                    placeholder="https://example.com/banner.jpg (мин. 800×418px)"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600">или</span>
+                    <label className="flex items-center gap-2 cursor-pointer bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 hover:text-white transition-colors">
+                      <Upload className="w-4 h-4" />
+                      {form.ogImageBlob ? "Файл загружен ✓" : "Загрузить с компьютера"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 3 * 1024 * 1024) { setError("Файл слишком большой (макс. 3MB)"); return; }
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            const dataUrl = ev.target?.result as string;
+                            const base64 = dataUrl.split(",")[1];
+                            setForm((f) => ({ ...f, ogImageBlob: base64, ogImageMime: file.type, ogImageUrl: "" }));
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                    {form.ogImageBlob && (
+                      <button onClick={() => setForm((f) => ({ ...f, ogImageBlob: "", ogImageMime: "" }))} className="text-xs text-red-400 hover:text-red-300">
+                        Удалить
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600">JPG/PNG/WebP · мин. 800×418px · макс. 3MB</p>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Превью */}
-          {(form.ogTitle || form.ogDescription || form.ogImageUrl) && (
+          {(form.ogTitle || form.ogDescription || form.ogImageUrl || form.ogImageBlob) && (
             <div className="border-t border-gray-800 pt-4">
               <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Предпросмотр</p>
               <div className="bg-gray-800 rounded-xl overflow-hidden max-w-sm border border-gray-700">
-                {form.ogImageUrl && (
+                {(form.ogImageUrl || form.ogImageBlob) && (
                   <div className="aspect-[1200/630] bg-gray-700 overflow-hidden">
                     <img
-                      src={form.ogImageUrl}
+                      src={form.ogImageBlob ? `data:${form.ogImageMime};base64,${form.ogImageBlob}` : form.ogImageUrl}
                       alt="preview"
                       className="w-full h-full object-cover"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}

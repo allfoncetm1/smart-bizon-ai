@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+function getOrigin(req: NextRequest) {
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "localhost:3000";
+  return `${proto}://${host}`;
+}
+
 export async function GET(req: NextRequest) {
   const projectId = req.nextUrl.searchParams.get("projectId");
   if (!projectId) return NextResponse.json([]);
@@ -14,7 +20,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { projectId, slug, destinationUrl, ogTitle, ogDescription, ogImageUrl } = body;
+  const { projectId, slug, destinationUrl, ogTitle, ogDescription, ogImageUrl, ogImageBlob, ogImageMime } = body;
 
   if (!projectId || !slug || !destinationUrl) {
     return NextResponse.json({ error: "Заполните обязательные поля" }, { status: 400 });
@@ -31,7 +37,18 @@ export async function POST(req: NextRequest) {
   }
 
   const link = await prisma.linkRedirect.create({
-    data: { projectId, slug: cleanSlug, destinationUrl, ogTitle, ogDescription, ogImageUrl },
+    data: { projectId, slug: cleanSlug, destinationUrl, ogTitle, ogDescription, ogImageUrl, ogImageBlob, ogImageMime },
   });
+
+  // If image was uploaded as blob — set its serving URL
+  if (ogImageBlob) {
+    const imageUrl = `${getOrigin(req)}/api/og-image/${link.id}`;
+    const updated = await prisma.linkRedirect.update({
+      where: { id: link.id },
+      data: { ogImageUrl: imageUrl },
+    });
+    return NextResponse.json(updated, { status: 201 });
+  }
+
   return NextResponse.json(link, { status: 201 });
 }
