@@ -21,6 +21,10 @@ services:
         sync: false
       - key: CRON_SECRET
         value: smart-bizon-cron-2026
+      - key: ADMIN_TELEGRAM_ID
+        value: "6371272028"
+      - key: NEXTAUTH_SECRET
+        sync: false
 
 databases:
   - name: smart-bizon-db

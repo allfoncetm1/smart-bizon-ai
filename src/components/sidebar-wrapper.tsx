@@ -6,8 +6,9 @@ import { Sidebar } from "./sidebar";
 export function SidebarWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isRedirectPage = pathname.startsWith("/r/");
+  const isLoginPage = pathname.startsWith("/login");
 
-  if (isRedirectPage) {
+  if (isRedirectPage || isLoginPage) {
     return <>{children}</>;
   }
 
