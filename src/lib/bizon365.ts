@@ -169,10 +169,27 @@ export class Bizon365Client {
       }
 
       // Пробуем все возможные названия поля с именем пользователя
-      const username = (
+      let username = (
         (msg.username ?? msg.name ?? msg.user ?? msg.u ??
-         msg.sender ?? msg.displayName ?? msg.n) as string | undefined
+         msg.sender ?? msg.displayName ?? msg.n ??
+         msg.nick ?? msg.nickname ?? msg.login ?? msg.viewer_name ?? msg.author) as string | undefined
       ) || undefined;
+
+      // Catch-all для имени: самая короткая строка которая не является текстом и не метаданными
+      if (!username) {
+        const TEXT_FIELDS = new Set(["text", "message", "msg", "body", "m", "content", "t", "txt"]);
+        let bestName: string | undefined;
+        for (const [k, v] of Object.entries(msg)) {
+          if (
+            !META_FIELDS.has(k) && !TEXT_FIELDS.has(k) &&
+            typeof v === "string" && v.trim().length > 0 &&
+            v !== text && v.length <= 80
+          ) {
+            if (!bestName || v.length < bestName.length) bestName = v.trim();
+          }
+        }
+        username = bestName;
+      }
 
       return {
         text,

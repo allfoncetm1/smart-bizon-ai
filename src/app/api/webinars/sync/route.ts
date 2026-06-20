@@ -105,6 +105,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Словарь зрителей по chatUserId и username для подстановки имён в сообщениях
+    const viewerNameByChatId: Record<string, string> = {};
+    for (const v of viewers) {
+      const name = v.username;
+      if (!name) continue;
+      if (v.chatUserId) viewerNameByChatId[v.chatUserId] = name;
+    }
+
     // Сохраняем сообщения чата
     if (messages.length > 0) {
       await prisma.chatMessage.deleteMany({ where: { webinarId: webinar.id } });
@@ -116,9 +124,14 @@ export async function POST(req: NextRequest) {
           data: slice.map((msg, j) => {
             const globalIdx = i + j;
             const mod = moderationResults[globalIdx];
+            // Имя: из сообщения → из словаря зрителей по chatUserId → null
+            const senderName =
+              msg.username ||
+              (msg.chatUserId ? viewerNameByChatId[msg.chatUserId] : undefined) ||
+              null;
             return {
               webinarId: webinar.id,
-              senderName: msg.username,
+              senderName,
               text: msg.text ?? "",
               sentAt: (() => { const d = msg.time ? new Date(msg.time) : null; return (d && !isNaN(d.getTime())) ? d : new Date(); })(),
               isSpam: mod?.isSpam ?? false,
