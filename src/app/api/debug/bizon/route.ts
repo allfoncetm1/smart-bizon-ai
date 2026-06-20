@@ -34,21 +34,23 @@ export async function GET(req: NextRequest) {
     sample = Object.fromEntries(keys.map(k => [k, (rawMessages as Record<string, unknown>)[k]]));
   }
 
+  // Show keys of first message to detect field names
+  const firstMsg = Array.isArray(rawMessages)
+    ? rawMessages[0]
+    : rawMessages && typeof rawMessages === "object"
+    ? Object.values(rawMessages as object)[0]
+    : null;
+
   return NextResponse.json({
     roomTitle: data.room_title,
     messagesType: Array.isArray(rawMessages) ? "array" : typeof rawMessages,
     totalMessages: Array.isArray(rawMessages)
-      ? rawMessages.length
+      ? (rawMessages as unknown[]).length
       : rawMessages && typeof rawMessages === "object"
       ? Object.keys(rawMessages as object).length
       : 0,
+    firstMessageKeys: firstMsg && typeof firstMsg === "object" ? Object.keys(firstMsg as object) : null,
+    firstMessageRaw: firstMsg,
     sample,
-    rawMessagesTS: (() => {
-      try {
-        const ts = inner.messagesTS;
-        if (typeof ts === "string") return JSON.parse(ts);
-        return ts;
-      } catch { return null; }
-    })(),
   });
 }

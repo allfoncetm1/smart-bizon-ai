@@ -35,6 +35,10 @@ export interface BizonChatMessage {
   username?: string;
   chatUserId?: string;
   phone?: string;
+  // raw Bizon365 field aliases (handled in parsing)
+  body?: string;
+  name?: string;
+  ts?: number;
 }
 
 export interface BizonWebinarDetail {
@@ -113,11 +117,17 @@ export class Bizon365Client {
       messagesTS = {};
     }
 
-    // Привязываем timestamp к каждому сообщению
-    const enrichedMessages: BizonChatMessage[] = messages.map((m, i) => ({
-      ...m,
-      time: messagesTS[i] ?? messagesTS[String(i)] ?? 0,
-    }));
+    // Normalize field names — Bizon365 uses body/name/ts in some versions
+    const enrichedMessages: BizonChatMessage[] = messages.map((m, i) => {
+      const raw = m as Record<string, unknown>;
+      return {
+        ...m,
+        text: (raw.text as string) || (raw.body as string) || "",
+        username: (raw.username as string) || (raw.name as string) || undefined,
+        chatUserId: (raw.chatUserId as string) || undefined,
+        time: messagesTS[i] ?? messagesTS[String(i)] ?? (raw.ts as number) ?? (raw.time as number) ?? 0,
+      };
+    });
 
     // Количество зрителей из report
     const viewersCount = inner.report
