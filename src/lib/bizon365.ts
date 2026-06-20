@@ -88,43 +88,75 @@ export class Bizon365Client {
     const roomTitle: string = data.room_title ?? "Без названия";
     const inner = data.report ?? {};
 
-    // messages — JSON-строка
-    let messages: BizonChatMessage[] = [];
+    // messages — может быть JSON-строкой, объектом или массивом на разных уровнях
+    let rawItems: unknown[] = [];
+    let messageKeys: string[] = [];
     try {
-      const rawMsgs = inner.messages;
-      if (typeof rawMsgs === "string") {
-        const parsed = JSON.parse(rawMsgs);
-        messages = Array.isArray(parsed)
-          ? parsed
-          : Object.values(parsed as Record<string, BizonChatMessage>);
-      } else if (Array.isArray(rawMsgs)) {
-        messages = rawMsgs;
-      } else if (rawMsgs && typeof rawMsgs === "object") {
-        messages = Object.values(rawMsgs);
+      // Ищем на двух уровнях: data.report.messages и data.messages
+      let src: unknown = inner.messages ?? data.messages;
+      if (typeof src === "string") src = JSON.parse(src);
+
+      if (Array.isArray(src)) {
+        rawItems = src;
+        messageKeys = src.map((_: unknown, i: number) => String(i));
+      } else if (src && typeof src === "object") {
+        messageKeys = Object.keys(src as Record<string, unknown>);
+        rawItems = Object.values(src as Record<string, unknown>);
       }
     } catch {
-      messages = [];
+      rawItems = [];
+      messageKeys = [];
     }
 
-    // messagesTS — тоже JSON-строка с временными метками
+    // messagesTS — JSON-строка с временными метками
     let messagesTS: Record<string, number> = {};
     try {
-      const rawTS = inner.messagesTS;
-      if (typeof rawTS === "string") {
-        messagesTS = JSON.parse(rawTS) ?? {};
+      let rawTS: unknown = inner.messagesTS ?? data.messagesTS;
+      if (typeof rawTS === "string") rawTS = JSON.parse(rawTS);
+      if (rawTS && typeof rawTS === "object" && !Array.isArray(rawTS)) {
+        messagesTS = rawTS as Record<string, number>;
       }
     } catch {
       messagesTS = {};
     }
 
-    // Normalize field names — Bizon365 uses body/name/ts in some versions
-    const enrichedMessages: BizonChatMessage[] = messages.map((m, i) => ({
-      ...m,
-      text: m.text || m.body || "",
-      username: m.username || m.name || undefined,
-      chatUserId: m.chatUserId || undefined,
-      time: messagesTS[i] ?? messagesTS[String(i)] ?? m.ts ?? m.time ?? 0,
-    }));
+    // Нормализуем каждое сообщение — Bizon365 возвращает разные форматы
+    const enrichedMessages: BizonChatMessage[] = rawItems.map((m: unknown, i: number) => {
+      const key = messageKeys[i] ?? String(i);
+      const ts = messagesTS[key] ?? messagesTS[String(i)] ?? 0;
+
+      // Если значение — строка, пробуем JSON.parse, иначе используем как текст
+      let msg: Record<string, unknown>;
+      if (typeof m === "string") {
+        try {
+          const parsed = JSON.parse(m);
+          msg = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : { text: m };
+        } catch {
+          msg = { text: m };
+        }
+      } else if (m && typeof m === "object") {
+        msg = m as Record<string, unknown>;
+      } else {
+        msg = {};
+      }
+
+      // Пробуем все возможные названия поля с текстом
+      const text = String(
+        msg.text ?? msg.message ?? msg.msg ?? msg.body ?? msg.m ?? msg.content ?? ""
+      );
+      // Пробуем все возможные названия поля с именем пользователя
+      const username = (
+        (msg.username ?? msg.name ?? msg.user ?? msg.u ?? msg.sender ?? msg.displayName) as string | undefined
+      ) || undefined;
+
+      return {
+        text,
+        username,
+        chatUserId: (msg.chatUserId ?? msg.chat_user_id ?? msg.userId ?? msg.uid) as string | undefined || undefined,
+        phone: msg.phone as string | undefined,
+        time: ts,
+      };
+    });
 
     // Количество зрителей из report
     const viewersCount = inner.report
