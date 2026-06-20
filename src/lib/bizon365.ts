@@ -143,13 +143,35 @@ export class Bizon365Client {
         msg = {};
       }
 
+      // Известные поля с метаданными — не трогаем при catch-all
+      const META_FIELDS = new Set([
+        "phone", "email", "ip", "chatUserId", "chat_user_id",
+        "userId", "uid", "city", "country", "region",
+      ]);
+      const NAME_FIELDS = new Set([
+        "username", "name", "user", "u", "sender", "displayName", "n",
+      ]);
+
       // Пробуем все возможные названия поля с текстом
-      const text = String(
-        msg.text ?? msg.message ?? msg.msg ?? msg.body ?? msg.m ?? msg.content ?? ""
+      let text = String(
+        msg.text ?? msg.message ?? msg.msg ?? msg.body ??
+        msg.m ?? msg.content ?? msg.t ?? msg.txt ?? ""
       );
+      // Catch-all: если все поля промахнулись — берём самую длинную строку не из мета/имени
+      if (!text) {
+        let best = "";
+        for (const [k, v] of Object.entries(msg)) {
+          if (!META_FIELDS.has(k) && !NAME_FIELDS.has(k) && typeof v === "string" && v.length > best.length) {
+            best = v;
+          }
+        }
+        text = best;
+      }
+
       // Пробуем все возможные названия поля с именем пользователя
       const username = (
-        (msg.username ?? msg.name ?? msg.user ?? msg.u ?? msg.sender ?? msg.displayName) as string | undefined
+        (msg.username ?? msg.name ?? msg.user ?? msg.u ??
+         msg.sender ?? msg.displayName ?? msg.n) as string | undefined
       ) || undefined;
 
       return {

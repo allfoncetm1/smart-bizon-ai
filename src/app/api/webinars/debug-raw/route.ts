@@ -49,12 +49,26 @@ export async function GET(req: NextRequest) {
     sampleItems = Object.entries(parsedMessages as Record<string, unknown>).slice(0, 3);
   }
 
+  // Ключи первых 3 сообщений
+  const sampleKeys: string[][] = [];
+  const sampleFull: unknown[] = [];
+  if (Array.isArray(parsedMessages)) {
+    parsedMessages.slice(0, 3).forEach((item) => {
+      if (item && typeof item === "object") {
+        sampleKeys.push(Object.keys(item as object));
+        sampleFull.push(item);
+      } else {
+        sampleKeys.push([]);
+        sampleFull.push(item);
+      }
+    });
+  }
+
   return NextResponse.json({
     topLevelKeys: Object.keys(data),
     reportKeys: Object.keys(inner),
     roomTitle: data.room_title,
 
-    // Тип поля messages
     messagesLocation: inner.messages !== undefined ? "data.report.messages" : data.messages !== undefined ? "data.messages" : "NOT FOUND",
     messagesRawType: typeof (inner.messages ?? data.messages),
     parsedMessagesType: Array.isArray(parsedMessages) ? "array" : typeof parsedMessages,
@@ -64,8 +78,9 @@ export async function GET(req: NextRequest) {
       ? Object.keys(parsedMessages as object).length
       : 0,
 
-    // Первые 3 сообщения — ЭТО ГЛАВНОЕ для диагноза
-    sampleItems,
+    // ВСЕ ключи первых 3 сообщений + полные объекты
+    sampleKeys,
+    sampleFull,
 
     // Тип messagesTS
     messagesTS_location: inner.messagesTS !== undefined ? "data.report.messagesTS" : "data.messagesTS",
