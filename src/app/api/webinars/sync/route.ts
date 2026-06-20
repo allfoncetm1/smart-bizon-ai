@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
           segment: ls.segment,
           score: ls.score,
           chatMessages: msgTextMap[key] ?? [],
-          clickedButtons: Array.isArray(v?.buttons) ? v.buttons.length : 0,
+          clickedButtons: v && Array.isArray(v.buttons) ? v.buttons.length : 0,
           country: v?.country,
         };
       });
@@ -242,17 +242,7 @@ export async function POST(req: NextRequest) {
         update: { segment, score: scoreValue, timeOnWebinar: v.timeOnWebinar ?? 0 },
       });
 
-      const aiCard = aiCardMap[identifier];
-      const aiCardFields = aiCard
-        ? {
-            painPoints: aiCard.painPoints,
-            objections: aiCard.objections,
-            openingPhrase: aiCard.openingPhrase,
-            recommendedProduct: aiCard.recommendedProduct,
-            aiCardAt: new Date(),
-          }
-        : {};
-
+      // Основной upsert лида — без AI-полей (безопасно при любой версии схемы)
       await prisma.lead.upsert({
         where: { email_webinarId: { email: identifier, webinarId: webinar.id } },
         create: {
@@ -264,15 +254,28 @@ export async function POST(req: NextRequest) {
           segment,
           score: scoreValue,
           notes: score?.recommendedAction,
-          ...aiCardFields,
         },
         update: {
           segment,
           score: scoreValue,
           notes: score?.recommendedAction,
-          ...aiCardFields,
         },
       });
+
+      // AI-карточка — отдельным update, не блокирует sync если колонок нет
+      const aiCard = aiCardMap[identifier];
+      if (aiCard) {
+        prisma.lead.update({
+          where: { email_webinarId: { email: identifier, webinarId: webinar.id } },
+          data: {
+            painPoints: aiCard.painPoints,
+            objections: aiCard.objections,
+            openingPhrase: aiCard.openingPhrase,
+            recommendedProduct: aiCard.recommendedProduct,
+            aiCardAt: new Date(),
+          },
+        }).catch(() => { /* колонки могут ещё не существовать */ });
+      }
     }
 
     // Статистика
