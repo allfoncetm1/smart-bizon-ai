@@ -19,6 +19,7 @@ export default function WebinarsPage() {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<Record<string, "idle" | "loading" | "done" | "error">>({});
   const [syncedDbId, setSyncedDbId] = useState<Record<string, string>>({});
+  const [syncErrors, setSyncErrors] = useState<Record<string, string>>({});
   const [projectId, setProjectId] = useState<string>("");
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function WebinarsPage() {
 
   async function syncWebinar(webinarId: string) {
     setSyncStatus((prev) => ({ ...prev, [webinarId]: "loading" }));
+    setSyncErrors((prev) => ({ ...prev, [webinarId]: "" }));
     setSyncingId(webinarId);
     try {
       const res = await fetch("/api/webinars/sync", {
@@ -52,17 +54,22 @@ export default function WebinarsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, webinarId }),
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setSyncStatus((prev) => ({ ...prev, [webinarId]: "done" }));
         if (data.webinarId) {
           setSyncedDbId((prev) => ({ ...prev, [webinarId]: data.webinarId }));
         }
       } else {
         setSyncStatus((prev) => ({ ...prev, [webinarId]: "error" }));
+        setSyncErrors((prev) => ({
+          ...prev,
+          [webinarId]: data.detail ?? data.error ?? `HTTP ${res.status}`,
+        }));
       }
-    } catch {
+    } catch (e) {
       setSyncStatus((prev) => ({ ...prev, [webinarId]: "error" }));
+      setSyncErrors((prev) => ({ ...prev, [webinarId]: String(e) }));
     } finally {
       setSyncingId(null);
     }
@@ -123,41 +130,48 @@ export default function WebinarsPage() {
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-300">{w.viewers}</td>
                     <td className="px-5 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        {st === "done" && dbId && (
-                          <Link
-                            href={`/webinars/${dbId}`}
-                            className="text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2"
+                      <div className="flex flex-col items-end gap-1.5">
+                        <div className="flex items-center gap-2">
+                          {st === "done" && dbId && (
+                            <Link
+                              href={`/webinars/${dbId}`}
+                              className="text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2"
+                            >
+                              Посмотреть →
+                            </Link>
+                          )}
+                          <button
+                            onClick={() => syncWebinar(w.webinarId)}
+                            disabled={syncingId === w.webinarId}
+                            className={cn(
+                              "flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg font-medium transition-colors",
+                              st === "done"
+                                ? "bg-green-500/10 text-green-400"
+                                : st === "error"
+                                ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                                : "bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50"
+                            )}
                           >
-                            Посмотреть →
-                          </Link>
+                            {st === "loading" ? (
+                              <RefreshCw className="w-4 h-4 animate-spin text-yellow-400" />
+                            ) : st === "done" ? (
+                              <CheckCircle className="w-4 h-4" />
+                            ) : st === "error" ? (
+                              <AlertCircle className="w-4 h-4" />
+                            ) : (
+                              <Play className="w-4 h-4" />
+                            )}
+                            {st === "idle" && "Анализировать"}
+                            {st === "loading" && "Обработка..."}
+                            {st === "done" && "Готово"}
+                            {st === "error" && "Ошибка — повторить"}
+                          </button>
+                        </div>
+                        {st === "error" && syncErrors[w.webinarId] && (
+                          <p className="text-xs text-red-400/80 max-w-xs text-right break-all">
+                            {syncErrors[w.webinarId]}
+                          </p>
                         )}
-                        <button
-                          onClick={() => syncWebinar(w.webinarId)}
-                          disabled={syncingId === w.webinarId}
-                          className={cn(
-                            "flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg font-medium transition-colors",
-                            st === "done"
-                              ? "bg-green-500/10 text-green-400"
-                              : st === "error"
-                              ? "bg-red-500/10 text-red-400"
-                              : "bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50"
-                          )}
-                        >
-                          {st === "loading" ? (
-                            <RefreshCw className="w-4 h-4 animate-spin text-yellow-400" />
-                          ) : st === "done" ? (
-                            <CheckCircle className="w-4 h-4" />
-                          ) : st === "error" ? (
-                            <AlertCircle className="w-4 h-4" />
-                          ) : (
-                            <Play className="w-4 h-4" />
-                          )}
-                          {st === "idle" && "Анализировать"}
-                          {st === "loading" && "Обработка..."}
-                          {st === "done" && "Готово"}
-                          {st === "error" && "Ошибка"}
-                        </button>
                       </div>
                     </td>
                   </tr>
