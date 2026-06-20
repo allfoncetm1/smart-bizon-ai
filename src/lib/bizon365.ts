@@ -114,7 +114,10 @@ export class Bizon365Client {
       let rawTS: unknown = inner.messagesTS ?? data.messagesTS;
       if (typeof rawTS === "string") rawTS = JSON.parse(rawTS);
       if (rawTS && typeof rawTS === "object" && !Array.isArray(rawTS)) {
-        messagesTS = rawTS as Record<string, number>;
+        for (const [k, v] of Object.entries(rawTS as Record<string, unknown>)) {
+          const n = Number(v);
+          if (!isNaN(n)) messagesTS[k] = n;
+        }
       }
     } catch {
       messagesTS = {};

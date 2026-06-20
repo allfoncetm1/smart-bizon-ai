@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
               webinarId: webinar.id,
               senderName: msg.username,
               text: msg.text ?? "",
-              sentAt: msg.time ? new Date(msg.time) : new Date(),
+              sentAt: (() => { const d = msg.time ? new Date(msg.time) : null; return (d && !isNaN(d.getTime())) ? d : new Date(); })(),
               isSpam: mod?.isSpam ?? false,
               isToxic: mod?.isToxic ?? false,
               isQuestion: mod?.isQuestion ?? false,
