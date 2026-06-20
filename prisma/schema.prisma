@@ -82,6 +82,7 @@ model Lead {
   openingPhrase      String?
   recommendedProduct String?
   aiCardAt           DateTime?
+  chatMessages       String[]    @default([])
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 

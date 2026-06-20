@@ -255,7 +255,11 @@ export async function POST(req: NextRequest) {
         update: { segment, score: scoreValue, timeOnWebinar: v.timeOnWebinar ?? 0 },
       });
 
-      // Основной upsert лида — без AI-полей (безопасно при любой версии схемы)
+      // Сообщения этого зрителя (ключ в msgTextMap = chatUserId ?? username ?? phone)
+      const msgKey = v.chatUserId ?? v.username ?? v.phone ?? "";
+      const viewerChatMessages = msgTextMap[msgKey] ?? [];
+
+      // Основной upsert лида
       await prisma.lead.upsert({
         where: { email_webinarId: { email: identifier, webinarId: webinar.id } },
         create: {
@@ -267,11 +271,13 @@ export async function POST(req: NextRequest) {
           segment,
           score: scoreValue,
           notes: score?.recommendedAction,
+          chatMessages: viewerChatMessages,
         },
         update: {
           segment,
           score: scoreValue,
           notes: score?.recommendedAction,
+          chatMessages: viewerChatMessages,
         },
       });
 

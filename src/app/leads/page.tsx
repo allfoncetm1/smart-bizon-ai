@@ -19,6 +19,7 @@ interface Lead {
   openingPhrase: string | null;
   recommendedProduct: string | null;
   aiCardAt: string | null;
+  chatMessages: string[];
 }
 
 const SEGMENTS = [
@@ -63,75 +64,94 @@ function CopyButton({ text }: { text: string }) {
 function AiCard({ lead }: { lead: Lead }) {
   const hasPainPoints = lead.painPoints && lead.painPoints.length > 0;
   const hasObjections = lead.objections && lead.objections.length > 0;
-
-  if (!lead.aiCardAt) {
-    return (
-      <div className="px-5 py-4 bg-gray-950 border-t border-gray-800">
-        <p className="text-xs text-gray-500">AI-карточка не сгенерирована. Участник попал вне топ-30 по баллу — пересинхронизируйте вебинар для получения карточки.</p>
-      </div>
-    );
-  }
+  const hasChatMessages = lead.chatMessages && lead.chatMessages.length > 0;
 
   return (
-    <div className="px-5 py-4 bg-gray-950 border-t border-gray-800 grid grid-cols-2 gap-4">
-      {/* Боли */}
-      <div>
-        <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
-          <span>🎯</span> Боли
-        </p>
-        {hasPainPoints ? (
-          <div className="flex flex-wrap gap-1.5">
-            {lead.painPoints.map((p, i) => (
-              <span key={i} className="text-xs bg-orange-500/10 text-orange-300 border border-orange-500/20 px-2 py-0.5 rounded-full">
-                {p}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-gray-600">Не определены</p>
-        )}
-      </div>
-
-      {/* Возражения */}
-      <div>
-        <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
-          <span>⚠️</span> Вероятные возражения
-        </p>
-        {hasObjections ? (
-          <div className="flex flex-wrap gap-1.5">
-            {lead.objections.map((o, i) => (
-              <span key={i} className="text-xs bg-red-500/10 text-red-300 border border-red-500/20 px-2 py-0.5 rounded-full">
-                {o}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-gray-600">Не определены</p>
-        )}
-      </div>
-
-      {/* Открывашка */}
-      {lead.openingPhrase && (
-        <div className="col-span-2">
-          <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
-            <span>📞</span> Первая фраза для звонка
+    <div className="bg-gray-950 border-t border-gray-800">
+      {/* Сообщения в чате — всегда показываем если есть */}
+      {hasChatMessages && (
+        <div className="px-5 py-4 border-b border-gray-800">
+          <p className="text-xs font-semibold text-gray-400 mb-2.5 flex items-center gap-1.5">
+            <span>💬</span> Писал в чате вебинара ({lead.chatMessages.length})
           </p>
-          <div className="flex items-start gap-2 bg-violet-500/10 border border-violet-500/20 rounded-lg px-3 py-2.5">
-            <p className="text-sm text-violet-200 flex-1 leading-relaxed">{lead.openingPhrase}</p>
-            <CopyButton text={lead.openingPhrase} />
+          <div className="flex flex-col gap-1.5">
+            {lead.chatMessages.map((msg, i) => (
+              <div key={i} className="flex items-start gap-2 bg-gray-900 rounded-lg px-3 py-2">
+                <span className="text-xs text-gray-600 mt-0.5 shrink-0">{i + 1}.</span>
+                <p className="text-sm text-gray-200 leading-relaxed">{msg}</p>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Рекомендуемый продукт */}
-      {lead.recommendedProduct && (
-        <div className="col-span-2">
-          <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
-            <span>🛍️</span> Рекомендовать
-          </p>
-          <span className="text-xs bg-green-500/10 text-green-300 border border-green-500/20 px-3 py-1.5 rounded-lg inline-block">
-            {lead.recommendedProduct}
-          </span>
+      {/* AI карточка */}
+      {!lead.aiCardAt ? (
+        <div className="px-5 py-4">
+          <p className="text-xs text-gray-500">AI-карточка не сгенерирована. Участник попал вне топ-30 по баллу — пересинхронизируйте вебинар.</p>
+        </div>
+      ) : (
+        <div className="px-5 py-4 grid grid-cols-2 gap-4">
+          {/* Боли */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
+              <span>🎯</span> Боли
+            </p>
+            {hasPainPoints ? (
+              <div className="flex flex-wrap gap-1.5">
+                {lead.painPoints.map((p, i) => (
+                  <span key={i} className="text-xs bg-orange-500/10 text-orange-300 border border-orange-500/20 px-2 py-0.5 rounded-full">
+                    {p}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-600">Не определены</p>
+            )}
+          </div>
+
+          {/* Возражения */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
+              <span>⚠️</span> Вероятные возражения
+            </p>
+            {hasObjections ? (
+              <div className="flex flex-wrap gap-1.5">
+                {lead.objections.map((o, i) => (
+                  <span key={i} className="text-xs bg-red-500/10 text-red-300 border border-red-500/20 px-2 py-0.5 rounded-full">
+                    {o}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-600">Не определены</p>
+            )}
+          </div>
+
+          {/* Открывашка */}
+          {lead.openingPhrase && (
+            <div className="col-span-2">
+              <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
+                <span>📞</span> Первая фраза для звонка
+              </p>
+              <div className="flex items-start gap-2 bg-violet-500/10 border border-violet-500/20 rounded-lg px-3 py-2.5">
+                <p className="text-sm text-violet-200 flex-1 leading-relaxed">{lead.openingPhrase}</p>
+                <CopyButton text={lead.openingPhrase} />
+              </div>
+            </div>
+          )}
+
+          {/* Рекомендуемый продукт */}
+          {lead.recommendedProduct && (
+            <div className="col-span-2">
+              <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
+                <span>🛍️</span> Рекомендовать
+              </p>
+              <span className="text-xs bg-green-500/10 text-green-300 border border-green-500/20 px-3 py-1.5 rounded-lg inline-block">
+                {lead.recommendedProduct}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
