@@ -211,6 +211,89 @@ ${JSON.stringify(viewersData, null, 2)}
   }
 }
 
+export interface LeadCard {
+  painPoints: string[];
+  objections: string[];
+  openingPhrase: string;
+  recommendedProduct: string;
+}
+
+interface ParticipantForCard {
+  identifier: string;
+  name?: string;
+  timeOnWebinar: number;
+  segment: string;
+  score: number;
+  chatMessages: string[];
+  clickedButtons: number;
+  country?: string;
+}
+
+export async function generateLeadCards(
+  participants: ParticipantForCard[],
+  context: {
+    webinarTitle: string;
+    productDescription?: string;
+  }
+): Promise<Record<string, LeadCard>> {
+  if (participants.length === 0) return {};
+
+  const participantsData = participants.map((p) => ({
+    id: p.identifier,
+    name: p.name ?? "Участник",
+    timeOnWebinar: `${Math.round(p.timeOnWebinar / 60)} мин`,
+    segment: p.segment,
+    score: p.score,
+    chatMessages: p.chatMessages.slice(0, 10),
+    clickedButtons: p.clickedButtons,
+    country: p.country ?? null,
+  }));
+
+  const response = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 4000,
+    messages: [
+      {
+        role: "user",
+        content: `Ты опытный менеджер по продажам. Проанализируй каждого участника вебинара и создай персональную карточку лида для отдела продаж.
+
+Вебинар: "${context.webinarTitle}"
+Продукт: ${context.productDescription ?? "не указан"}
+
+Участники (JSON):
+${JSON.stringify(participantsData, null, 2)}
+
+Правила:
+- Опирайся ТОЛЬКО на реальные данные (сообщения, поведение). Не придумывай то, чего нет.
+- Боли — что беспокоит человека, исходя из его вопросов и поведения
+- Возражения — наиболее вероятные причины отказа от покупки
+- Открывашка — живая первая фраза для звонка, персонализированная под этого конкретного человека
+- Продукт — конкретный тариф/продукт, который подходит этому человеку
+
+Верни ТОЛЬКО JSON объект (ключ = id участника):
+{
+  "<id>": {
+    "painPoints": ["боль 1", "боль 2"],
+    "objections": ["возражение 1", "возражение 2"],
+    "openingPhrase": "Готовая фраза для начала звонка (1-2 предложения)",
+    "recommendedProduct": "название продукта или тариф"
+  }
+}`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text : "{}";
+
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function generateWebinarSummary(
   data: {
     title: string;

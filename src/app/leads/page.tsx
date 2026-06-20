@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Download } from "lucide-react";
+import { Search, Download, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Lead {
@@ -14,6 +14,11 @@ interface Lead {
   notes: string | null;
   hasPurchased: boolean;
   createdAt: string;
+  painPoints: string[];
+  objections: string[];
+  openingPhrase: string | null;
+  recommendedProduct: string | null;
+  aiCardAt: string | null;
 }
 
 const SEGMENTS = [
@@ -35,6 +40,104 @@ const segmentLabel: Record<string, string> = {
   COLD: "❄️ Холодный",
 };
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex-shrink-0 p-1 rounded text-gray-500 hover:text-violet-400 transition-colors"
+      title="Копировать"
+    >
+      {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
+function AiCard({ lead }: { lead: Lead }) {
+  const hasPainPoints = lead.painPoints && lead.painPoints.length > 0;
+  const hasObjections = lead.objections && lead.objections.length > 0;
+
+  if (!lead.aiCardAt) {
+    return (
+      <div className="px-5 py-4 bg-gray-950 border-t border-gray-800">
+        <p className="text-xs text-gray-500">AI-карточка не сгенерирована. Участник попал вне топ-30 по баллу — пересинхронизируйте вебинар для получения карточки.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-5 py-4 bg-gray-950 border-t border-gray-800 grid grid-cols-2 gap-4">
+      {/* Боли */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
+          <span>🎯</span> Боли
+        </p>
+        {hasPainPoints ? (
+          <div className="flex flex-wrap gap-1.5">
+            {lead.painPoints.map((p, i) => (
+              <span key={i} className="text-xs bg-orange-500/10 text-orange-300 border border-orange-500/20 px-2 py-0.5 rounded-full">
+                {p}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-600">Не определены</p>
+        )}
+      </div>
+
+      {/* Возражения */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
+          <span>⚠️</span> Вероятные возражения
+        </p>
+        {hasObjections ? (
+          <div className="flex flex-wrap gap-1.5">
+            {lead.objections.map((o, i) => (
+              <span key={i} className="text-xs bg-red-500/10 text-red-300 border border-red-500/20 px-2 py-0.5 rounded-full">
+                {o}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-600">Не определены</p>
+        )}
+      </div>
+
+      {/* Открывашка */}
+      {lead.openingPhrase && (
+        <div className="col-span-2">
+          <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
+            <span>📞</span> Первая фраза для звонка
+          </p>
+          <div className="flex items-start gap-2 bg-violet-500/10 border border-violet-500/20 rounded-lg px-3 py-2.5">
+            <p className="text-sm text-violet-200 flex-1 leading-relaxed">{lead.openingPhrase}</p>
+            <CopyButton text={lead.openingPhrase} />
+          </div>
+        </div>
+      )}
+
+      {/* Рекомендуемый продукт */}
+      {lead.recommendedProduct && (
+        <div className="col-span-2">
+          <p className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
+            <span>🛍️</span> Рекомендовать
+          </p>
+          <span className="text-xs bg-green-500/10 text-green-300 border border-green-500/20 px-3 py-1.5 rounded-lg inline-block">
+            {lead.recommendedProduct}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
@@ -44,6 +147,7 @@ export default function LeadsPage() {
   const [projectId, setProjectId] = useState<string>("");
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/projects")
@@ -85,6 +189,10 @@ export default function LeadsPage() {
     const params = new URLSearchParams({ projectId });
     if (segment) params.set("segment", segment);
     window.open(`/api/leads/export?${params}`, "_blank");
+  }
+
+  function toggleExpand(id: string) {
+    setExpandedId((prev) => (prev === id ? null : id));
   }
 
   return (
@@ -149,43 +257,74 @@ export default function LeadsPage() {
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Контакт</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Сегмент</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Балл</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Рекомендация AI</th>
+                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Рекомендация</th>
+                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">AI карточка</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {filtered.map((lead) => (
-                <tr key={lead.id} className="hover:bg-gray-800/50 transition-colors">
-                  <td className="px-5 py-3">
-                    <p className="text-sm text-white">{lead.name ?? lead.email}</p>
-                    <p className="text-xs text-gray-500">{lead.email}</p>
-                    {lead.phone && (
-                      <p className="text-xs text-gray-500">{lead.phone}</p>
-                    )}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={cn("text-xs px-2 py-1 rounded-full", segmentBadge[lead.segment])}>
-                      {segmentLabel[lead.segment] ?? lead.segment}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                        <div
-                          className={cn(
-                            "h-full rounded-full",
-                            lead.score >= 70 ? "bg-red-500" : lead.score >= 40 ? "bg-yellow-500" : "bg-blue-500"
-                          )}
-                          style={{ width: `${lead.score}%` }}
-                        />
+              {filtered.flatMap((lead) => {
+                const rows = [
+                  <tr
+                    key={lead.id}
+                    onClick={() => toggleExpand(lead.id)}
+                    className="hover:bg-gray-800/50 transition-colors cursor-pointer"
+                  >
+                    <td className="px-5 py-3">
+                      <p className="text-sm text-white">{lead.name ?? lead.email}</p>
+                      <p className="text-xs text-gray-500">{lead.email}</p>
+                      {lead.phone && (
+                        <p className="text-xs text-gray-500">{lead.phone}</p>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className={cn("text-xs px-2 py-1 rounded-full", segmentBadge[lead.segment])}>
+                        {segmentLabel[lead.segment] ?? lead.segment}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full",
+                              lead.score >= 70 ? "bg-red-500" : lead.score >= 40 ? "bg-yellow-500" : "bg-blue-500"
+                            )}
+                            style={{ width: `${lead.score}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-white">{lead.score}</span>
                       </div>
-                      <span className="text-sm text-white">{lead.score}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 max-w-xs">
-                    <p className="text-xs text-gray-400 truncate">{lead.notes ?? "—"}</p>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-5 py-3 max-w-xs">
+                      <p className="text-xs text-gray-400 truncate">{lead.notes ?? "—"}</p>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {lead.aiCardAt ? (
+                          <span className="text-xs text-violet-400 font-medium">🤖 Есть</span>
+                        ) : (
+                          <span className="text-xs text-gray-600">—</span>
+                        )}
+                        {expandedId === lead.id ? (
+                          <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                        )}
+                      </div>
+                    </td>
+                  </tr>,
+                ];
+                if (expandedId === lead.id) {
+                  rows.push(
+                    <tr key={`${lead.id}-card`}>
+                      <td colSpan={5} className="p-0">
+                        <AiCard lead={lead} />
+                      </td>
+                    </tr>
+                  );
+                }
+                return rows;
+              })}
             </tbody>
           </table>
         )}

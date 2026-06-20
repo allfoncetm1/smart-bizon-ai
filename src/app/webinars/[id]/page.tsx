@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,14 @@ interface Participant {
   score: number;
   timeOnWebinar: number;
   country: string | null;
+}
+
+interface ParticipantLead {
+  painPoints: string[];
+  objections: string[];
+  openingPhrase: string | null;
+  recommendedProduct: string | null;
+  aiCardAt: string | null;
 }
 
 interface Analytics {
@@ -69,6 +77,10 @@ export default function WebinarDetailPage() {
   const [webinar, setWebinar] = useState<Webinar | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [chatFilter, setChatFilter] = useState<"all" | "spam" | "toxic" | "questions">("all");
+  const [expandedParticipant, setExpandedParticipant] = useState<string | null>(null);
+  const [leadCards, setLeadCards] = useState<Record<string, ParticipantLead>>({});
+  const [leadsLoaded, setLeadsLoaded] = useState(false);
+  const [copiedPhrase, setCopiedPhrase] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/webinars/${id}`)
@@ -306,39 +318,149 @@ export default function WebinarDetailPage() {
                 <th className="text-left text-xs text-gray-400 font-medium px-4 py-3">Балл</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-4 py-3">Время</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-4 py-3">Страна</th>
+                <th className="text-left text-xs text-gray-400 font-medium px-4 py-3">AI карточка</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {webinar.participants.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-800/50">
-                  <td className="px-4 py-3">
-                    <p className="text-sm text-white">{p.name ?? p.email}</p>
-                    {p.phone && <p className="text-xs text-gray-500">{p.phone}</p>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={cn("text-xs px-2 py-1 rounded-full", segmentBadge[p.segment])}>
-                      {segmentEmoji[p.segment]} {p.segment}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                        <div
-                          className={cn("h-full rounded-full",
-                            p.score >= 70 ? "bg-red-500" : p.score >= 40 ? "bg-yellow-500" : "bg-blue-500"
-                          )}
-                          style={{ width: `${p.score}%` }}
-                        />
+              {webinar.participants.flatMap((p) => {
+                const card = leadCards[p.email];
+                const isExpanded = expandedParticipant === p.id;
+
+                const mainRow = (
+                  <tr
+                    key={p.id}
+                    onClick={async () => {
+                      if (isExpanded) { setExpandedParticipant(null); return; }
+                      setExpandedParticipant(p.id);
+                      if (!leadsLoaded) {
+                        const res = await fetch(`/api/leads?webinarId=${id}&page=1`);
+                        const data = await res.json();
+                        const map: Record<string, ParticipantLead> = {};
+                        for (const lead of data.leads ?? []) {
+                          map[lead.email] = {
+                            painPoints: lead.painPoints ?? [],
+                            objections: lead.objections ?? [],
+                            openingPhrase: lead.openingPhrase ?? null,
+                            recommendedProduct: lead.recommendedProduct ?? null,
+                            aiCardAt: lead.aiCardAt ?? null,
+                          };
+                        }
+                        setLeadCards(map);
+                        setLeadsLoaded(true);
+                      }
+                    }}
+                    className="hover:bg-gray-800/50 cursor-pointer transition-colors"
+                  >
+                    <td className="px-4 py-3">
+                      <p className="text-sm text-white">{p.name ?? p.email}</p>
+                      {p.phone && <p className="text-xs text-gray-500">{p.phone}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn("text-xs px-2 py-1 rounded-full", segmentBadge[p.segment])}>
+                        {segmentEmoji[p.segment]} {p.segment}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                          <div
+                            className={cn("h-full rounded-full",
+                              p.score >= 70 ? "bg-red-500" : p.score >= 40 ? "bg-yellow-500" : "bg-blue-500"
+                            )}
+                            style={{ width: `${p.score}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-white">{p.score}</span>
                       </div>
-                      <span className="text-sm text-white">{p.score}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-400">
-                    {Math.round(p.timeOnWebinar / 60)} мин
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-400">{p.country ?? "—"}</td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-400">{Math.round(p.timeOnWebinar / 60)} мин</td>
+                    <td className="px-4 py-3 text-sm text-gray-400">{p.country ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {card?.aiCardAt
+                          ? <span className="text-xs text-violet-400 font-medium">🤖 Есть</span>
+                          : <span className="text-xs text-gray-600">—</span>
+                        }
+                        {isExpanded
+                          ? <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
+                          : <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                );
+
+                if (!isExpanded) return [mainRow];
+
+                const cardRow = (
+                  <tr key={`${p.id}-card`}>
+                    <td colSpan={6} className="p-0">
+                      {!card || !card.aiCardAt ? (
+                        <div className="px-5 py-4 bg-gray-950 border-t border-gray-800">
+                          <p className="text-xs text-gray-500">
+                            {!card ? "AI-карточка не сгенерирована для этого участника." : "Участник вне топ-30 по баллу — карточка не создавалась."}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="px-5 py-4 bg-gray-950 border-t border-gray-800 grid grid-cols-2 gap-4">
+                          {card.painPoints.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-gray-400 mb-2">🎯 Боли</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {card.painPoints.map((pt, i) => (
+                                  <span key={i} className="text-xs bg-orange-500/10 text-orange-300 border border-orange-500/20 px-2 py-0.5 rounded-full">{pt}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {card.objections.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-gray-400 mb-2">⚠️ Возражения</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {card.objections.map((obj, i) => (
+                                  <span key={i} className="text-xs bg-red-500/10 text-red-300 border border-red-500/20 px-2 py-0.5 rounded-full">{obj}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {card.openingPhrase && (
+                            <div className="col-span-2">
+                              <p className="text-xs font-semibold text-gray-400 mb-2">📞 Первая фраза</p>
+                              <div className="flex items-start gap-2 bg-violet-500/10 border border-violet-500/20 rounded-lg px-3 py-2.5">
+                                <p className="text-sm text-violet-200 flex-1 leading-relaxed">{card.openingPhrase}</p>
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    await navigator.clipboard.writeText(card.openingPhrase!);
+                                    setCopiedPhrase(p.id);
+                                    setTimeout(() => setCopiedPhrase(null), 2000);
+                                  }}
+                                  className="flex-shrink-0 p-1 rounded text-gray-500 hover:text-violet-400 transition-colors"
+                                >
+                                  {copiedPhrase === p.id
+                                    ? <Check className="w-3.5 h-3.5 text-green-400" />
+                                    : <Copy className="w-3.5 h-3.5" />
+                                  }
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {card.recommendedProduct && (
+                            <div className="col-span-2">
+                              <p className="text-xs font-semibold text-gray-400 mb-2">🛍️ Рекомендовать</p>
+                              <span className="text-xs bg-green-500/10 text-green-300 border border-green-500/20 px-3 py-1.5 rounded-lg inline-block">
+                                {card.recommendedProduct}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+
+                return [mainRow, cardRow];
+              })}
             </tbody>
           </table>
         </div>

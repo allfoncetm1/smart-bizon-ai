@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createBizon365Client } from "@/lib/bizon365";
-import { moderateChatMessages, generateWebinarSummary, generateAutoAnswer } from "@/lib/ai-agent";
+import { moderateChatMessages, generateWebinarSummary, generateAutoAnswer, generateLeadCards } from "@/lib/ai-agent";
 import { notifyHotLead, notifyWebinarDone } from "@/lib/telegram";
 import type { BizonChatMessage, BizonViewer } from "@/lib/bizon365";
 
@@ -133,9 +133,16 @@ export async function POST(req: NextRequest) {
 
     // Считаем сообщения на участника по chatUserId/username
     const msgCountMap: Record<string, number> = {};
+    const msgTextMap: Record<string, string[]> = {};
     for (const msg of messages) {
       const key = msg.chatUserId ?? msg.username ?? msg.phone ?? "";
-      if (key) msgCountMap[key] = (msgCountMap[key] ?? 0) + 1;
+      if (key) {
+        msgCountMap[key] = (msgCountMap[key] ?? 0) + 1;
+        if (msg.text) {
+          if (!msgTextMap[key]) msgTextMap[key] = [];
+          msgTextMap[key].push(msg.text);
+        }
+      }
     }
 
     // Максимальное время просмотра для нормализации
@@ -172,6 +179,41 @@ export async function POST(req: NextRequest) {
       return { email: v.email, score, segment: segment as "HOT" | "WARM" | "COLD", reasoning: `Время: ${v.timeOnWebinar}с, сообщений: ${v.messagesCount}, кликов: ${v.clickedButtons}`, recommendedAction: action };
     });
 
+    // AI карточки лидов — топ-30 по баллу (батчи по 5)
+    const aiCardMap: Record<string, Awaited<ReturnType<typeof generateLeadCards>>[string]> = {};
+    const TOP_FOR_CARDS = 30;
+    const CARD_BATCH = 5;
+    const sortedForCards = [...leadScores]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, TOP_FOR_CARDS);
+
+    for (let i = 0; i < sortedForCards.length; i += CARD_BATCH) {
+      const batch = sortedForCards.slice(i, i + CARD_BATCH);
+      const batchInput = batch.map((ls) => {
+        const v = viewers.find(
+          (vw) => (vw.phone ?? vw.chatUserId ?? vw.username) === ls.email
+        );
+        const key = v ? (v.chatUserId ?? v.username ?? v.phone ?? "") : "";
+        return {
+          identifier: ls.email,
+          name: v?.username,
+          timeOnWebinar: v?.timeOnWebinar ?? 0,
+          segment: ls.segment,
+          score: ls.score,
+          chatMessages: msgTextMap[key] ?? [],
+          clickedButtons: Array.isArray(v?.buttons) ? v.buttons.length : 0,
+          country: v?.country,
+        };
+      });
+      try {
+        const cards = await generateLeadCards(batchInput, {
+          webinarTitle: detail.roomTitle,
+          productDescription: config?.productDescription ?? undefined,
+        });
+        Object.assign(aiCardMap, cards);
+      } catch { /* не блокируем синк */ }
+    }
+
     // Сохраняем участников и лиды
     for (let i = 0; i < viewers.length; i++) {
       const v = viewers[i];
@@ -200,6 +242,17 @@ export async function POST(req: NextRequest) {
         update: { segment, score: scoreValue, timeOnWebinar: v.timeOnWebinar ?? 0 },
       });
 
+      const aiCard = aiCardMap[identifier];
+      const aiCardFields = aiCard
+        ? {
+            painPoints: aiCard.painPoints,
+            objections: aiCard.objections,
+            openingPhrase: aiCard.openingPhrase,
+            recommendedProduct: aiCard.recommendedProduct,
+            aiCardAt: new Date(),
+          }
+        : {};
+
       await prisma.lead.upsert({
         where: { email_webinarId: { email: identifier, webinarId: webinar.id } },
         create: {
@@ -211,11 +264,13 @@ export async function POST(req: NextRequest) {
           segment,
           score: scoreValue,
           notes: score?.recommendedAction,
+          ...aiCardFields,
         },
         update: {
           segment,
           score: scoreValue,
           notes: score?.recommendedAction,
+          ...aiCardFields,
         },
       });
     }
