@@ -4,11 +4,19 @@ import { verifyTelegramData, createSessionToken, COOKIE_NAME } from "@/lib/auth"
 
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID ?? "6371272028";
 
+function getOrigin(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "localhost:3000";
+  return `${proto}://${host}`;
+}
+
 export async function GET(req: NextRequest) {
   const params = Object.fromEntries(req.nextUrl.searchParams.entries());
+  const origin = getOrigin(req);
 
   if (!verifyTelegramData(params)) {
-    return NextResponse.redirect(new URL("/login?denied=1", req.url));
+    return NextResponse.redirect(`${origin}/login?denied=1`);
   }
 
   const telegramId = params.id;
@@ -37,7 +45,7 @@ export async function GET(req: NextRequest) {
   });
 
   if (!user.hasAccess) {
-    return NextResponse.redirect(new URL("/login?denied=1", req.url));
+    return NextResponse.redirect(`${origin}/login?denied=1`);
   }
 
   const token = createSessionToken({
@@ -48,7 +56,7 @@ export async function GET(req: NextRequest) {
     hasAccess: user.hasAccess,
   });
 
-  const res = NextResponse.redirect(new URL("/", req.url));
+  const res = NextResponse.redirect(`${origin}/`);
   res.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
