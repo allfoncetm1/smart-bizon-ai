@@ -88,129 +88,93 @@ export class Bizon365Client {
     const roomTitle: string = data.room_title ?? "Без названия";
     const inner = data.report ?? {};
 
-    // messages — может быть JSON-строкой, объектом или массивом на разных уровнях
-    let rawItems: unknown[] = [];
-    let messageKeys: string[] = [];
+    // Bizon365 формат: messages = { [chatUserId]: string[] }
+    // messagesTS = { [chatUserId]: number[] } (секунды от начала вебинара)
+    let messagesMap: Record<string, unknown> | null = null;
+    let messagesList: unknown[] | null = null;
     try {
-      // Ищем на двух уровнях: data.report.messages и data.messages
       let src: unknown = inner.messages ?? data.messages;
       if (typeof src === "string") src = JSON.parse(src);
-
       if (Array.isArray(src)) {
-        rawItems = src;
-        messageKeys = src.map((_: unknown, i: number) => String(i));
+        messagesList = src;
       } else if (src && typeof src === "object") {
-        messageKeys = Object.keys(src as Record<string, unknown>);
-        rawItems = Object.values(src as Record<string, unknown>);
+        messagesMap = src as Record<string, unknown>;
       }
-    } catch {
-      rawItems = [];
-      messageKeys = [];
-    }
+    } catch { /* ignore */ }
 
-    // messagesTS — JSON-строка с временными метками
-    let messagesTS: Record<string, number> = {};
+    let tsMap: Record<string, unknown> = {};
     try {
       let rawTS: unknown = inner.messagesTS ?? data.messagesTS;
       if (typeof rawTS === "string") rawTS = JSON.parse(rawTS);
       if (rawTS && typeof rawTS === "object" && !Array.isArray(rawTS)) {
-        for (const [k, v] of Object.entries(rawTS as Record<string, unknown>)) {
-          const n = Number(v);
-          if (!isNaN(n)) messagesTS[k] = n;
+        tsMap = rawTS as Record<string, unknown>;
+      }
+    } catch { /* ignore */ }
+
+    const enrichedMessages: BizonChatMessage[] = [];
+
+    if (messagesMap) {
+      // Основной формат Bizon365: ключ = chatUserId, значение = string[]
+      for (const [chatUserId, msgData] of Object.entries(messagesMap)) {
+        const msgArray: unknown[] = Array.isArray(msgData) ? msgData : [msgData];
+        const tsRaw = tsMap[chatUserId];
+        const tsArray: number[] = Array.isArray(tsRaw) ? tsRaw.map(Number) : [];
+
+        for (let i = 0; i < msgArray.length; i++) {
+          const raw = msgArray[i];
+          let text = "";
+          if (typeof raw === "string") {
+            text = raw;
+          } else if (raw && typeof raw === "object") {
+            const obj = raw as Record<string, unknown>;
+            text = String(
+              obj.text ?? obj.message ?? obj.msg ?? obj.body ??
+              obj.m ?? obj.content ?? obj.t ?? obj.txt ?? ""
+            );
+            if (!text) {
+              let best = "";
+              for (const [, v] of Object.entries(obj)) {
+                if (typeof v === "string" && v.length > best.length) best = v;
+              }
+              text = best;
+            }
+          }
+          enrichedMessages.push({
+            text,
+            chatUserId,
+            username: undefined, // подставляется из viewers в sync route
+            phone: undefined,
+            time: tsArray[i] ?? 0,
+          });
         }
       }
-    } catch {
-      messagesTS = {};
+    } else if (messagesList) {
+      // Запасной формат: массив объектов сообщений
+      for (const m of messagesList) {
+        if (!m || typeof m !== "object") continue;
+        const obj = m as Record<string, unknown>;
+        const text = String(
+          obj.text ?? obj.message ?? obj.msg ?? obj.body ??
+          obj.m ?? obj.content ?? obj.t ?? obj.txt ?? ""
+        );
+        const username = (
+          obj.username ?? obj.name ?? obj.user ?? obj.u ??
+          obj.sender ?? obj.displayName ?? obj.n ?? obj.nick
+        ) as string | undefined || undefined;
+        enrichedMessages.push({
+          text,
+          username,
+          chatUserId: (obj.chatUserId ?? obj.chat_user_id ?? obj.userId ?? obj.uid) as string | undefined || undefined,
+          phone: obj.phone as string | undefined,
+          time: typeof obj.ts === "number" ? obj.ts : typeof obj.time === "number" ? obj.time : 0,
+        });
+      }
     }
-
-    // Нормализуем каждое сообщение — Bizon365 возвращает разные форматы
-    const enrichedMessages: BizonChatMessage[] = rawItems.map((m: unknown, i: number) => {
-      const key = messageKeys[i] ?? String(i);
-      const ts = messagesTS[key] ?? messagesTS[String(i)] ?? 0;
-
-      // Если значение — строка, пробуем JSON.parse, иначе используем как текст
-      let msg: Record<string, unknown>;
-      if (typeof m === "string") {
-        try {
-          const parsed = JSON.parse(m);
-          msg = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : { text: m };
-        } catch {
-          msg = { text: m };
-        }
-      } else if (m && typeof m === "object") {
-        msg = m as Record<string, unknown>;
-      } else {
-        msg = {};
-      }
-
-      // Известные поля с метаданными — не трогаем при catch-all
-      const META_FIELDS = new Set([
-        "phone", "email", "ip", "chatUserId", "chat_user_id",
-        "userId", "uid", "city", "country", "region",
-      ]);
-      const NAME_FIELDS = new Set([
-        "username", "name", "user", "u", "sender", "displayName", "n",
-      ]);
-
-      // Пробуем все возможные названия поля с текстом
-      let text = String(
-        msg.text ?? msg.message ?? msg.msg ?? msg.body ??
-        msg.m ?? msg.content ?? msg.t ?? msg.txt ?? ""
-      );
-      // Catch-all: если все поля промахнулись — берём самую длинную строку не из мета/имени
-      if (!text) {
-        let best = "";
-        for (const [k, v] of Object.entries(msg)) {
-          if (!META_FIELDS.has(k) && !NAME_FIELDS.has(k) && typeof v === "string" && v.length > best.length) {
-            best = v;
-          }
-        }
-        text = best;
-      }
-
-      // Пробуем все возможные названия поля с именем пользователя
-      let username = (
-        (msg.username ?? msg.name ?? msg.user ?? msg.u ??
-         msg.sender ?? msg.displayName ?? msg.n ??
-         msg.nick ?? msg.nickname ?? msg.login ?? msg.viewer_name ?? msg.author) as string | undefined
-      ) || undefined;
-
-      // Catch-all для имени: самая короткая строка которая не является текстом и не метаданными
-      if (!username) {
-        const TEXT_FIELDS = new Set(["text", "message", "msg", "body", "m", "content", "t", "txt"]);
-        let bestName: string | undefined;
-        for (const [k, v] of Object.entries(msg)) {
-          if (
-            !META_FIELDS.has(k) && !TEXT_FIELDS.has(k) &&
-            typeof v === "string" && v.trim().length > 0 &&
-            v !== text && v.length <= 80
-          ) {
-            if (!bestName || v.length < bestName.length) bestName = v.trim();
-          }
-        }
-        username = bestName;
-      }
-
-      return {
-        text,
-        username,
-        chatUserId: (msg.chatUserId ?? msg.chat_user_id ?? msg.userId ?? msg.uid) as string | undefined || undefined,
-        phone: msg.phone as string | undefined,
-        time: ts,
-      };
-    });
-
-    // Количество зрителей из report
-    const viewersCount = inner.report
-      ? Array.isArray(inner.report)
-        ? inner.report.length
-        : Object.keys(inner.report).length
-      : 0;
 
     return {
       roomTitle,
       messages: enrichedMessages,
-      viewersCount,
+      viewersCount: 0,
       duration: 0,
     };
   }
