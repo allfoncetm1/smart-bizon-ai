@@ -378,6 +378,7 @@ export async function POST(req: NextRequest) {
         data: { status: "ERROR" },
       }).catch(() => {});
     }
-    return NextResponse.json({ error: "Ошибка синхронизации" }, { status: 500 });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: "Ошибка синхронизации", detail: errMsg }, { status: 500 });
   }
 }
