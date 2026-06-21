@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/webinars/auto-sync",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/webinars/auto-sync",
+      "schedule": "*/10 16-18 * * *"
+    }
+  ]
+}
