@@ -1,8 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Download, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
+import { Search, Download, ChevronDown, ChevronUp, Copy, Check, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface SyncedWebinar {
+  id: string;
+  title: string;
+  bizonId: string;
+  viewersCount: number;
+}
 
 interface Lead {
   id: string;
@@ -168,25 +175,33 @@ export default function LeadsPage() {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [webinars, setWebinars] = useState<SyncedWebinar[]>([]);
+  const [selectedWebinarId, setSelectedWebinarId] = useState<string>("");
 
   useEffect(() => {
     fetch("/api/projects")
       .then((r) => r.json())
       .then((projects) => {
-        if (projects[0]) setProjectId(projects[0].id);
+        if (projects[0]) {
+          setProjectId(projects[0].id);
+          fetch(`/api/webinars/synced?projectId=${projects[0].id}`)
+            .then((r) => r.json())
+            .then(setWebinars);
+        }
       });
   }, []);
 
   useEffect(() => {
     if (!projectId) return;
     loadLeads(1);
-  }, [projectId, segment]);
+  }, [projectId, segment, selectedWebinarId]);
 
   async function loadLeads(p: number) {
     setLoading(true);
     try {
       const params = new URLSearchParams({ projectId, page: String(p) });
       if (segment) params.set("segment", segment);
+      if (selectedWebinarId) params.set("webinarId", selectedWebinarId);
       const res = await fetch(`/api/leads?${params}`);
       const data = await res.json();
       setLeads(data.leads ?? []);
@@ -234,7 +249,27 @@ export default function LeadsPage() {
       </div>
 
       {/* Фильтры */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Фильтр по вебинару */}
+        {webinars.length > 0 && (
+          <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5">
+            <Video className="w-4 h-4 text-gray-500 shrink-0" />
+            <select
+              value={selectedWebinarId}
+              onChange={(e) => { setSelectedWebinarId(e.target.value); setExpandedId(null); }}
+              className="bg-transparent text-sm text-white focus:outline-none cursor-pointer min-w-[180px] max-w-[280px]"
+            >
+              <option value="">Все вебинары</option>
+              {webinars.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.title} ({w.viewersCount})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Фильтр по сегменту */}
         <div className="flex bg-gray-900 border border-gray-800 rounded-lg p-1 gap-1">
           {SEGMENTS.map((s) => (
             <button
@@ -251,6 +286,7 @@ export default function LeadsPage() {
             </button>
           ))}
         </div>
+
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <input
