@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, Plus, Trash2, LogOut, ShieldCheck, ShieldOff, UserCheck, UserX } from "lucide-react";
+import { Trash2, ShieldCheck, ShieldOff, UserCheck, UserX } from "lucide-react";
 
 interface Project {
   id: string;
@@ -25,43 +25,34 @@ interface TgUser {
   createdAt: string;
 }
 
+const inputStyle: React.CSSProperties = { width: "100%", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", fontFamily: "inherit", fontSize: 14, color: "var(--text)", background: "var(--card)", outline: "none" };
+const labelStyle: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, marginBottom: 7, color: "var(--text)" };
+const card: React.CSSProperties = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, boxShadow: "0 1px 2px rgba(20,20,50,.04)" };
+
 export default function SettingsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState({ name: "", bizonId: "", apiToken: "" });
   const [creating, setCreating] = useState(false);
   const [saved, setSaved] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
   const [users, setUsers] = useState<TgUser[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/projects")
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setProjects)
-      .catch(console.error);
-
-    fetch("/api/users")
-      .then((r) => {
-        if (r.status === 403) return null;
-        if (!r.ok) return null;
-        setIsAdmin(true);
-        return r.json();
-      })
-      .then((data) => { if (data) setUsers(data); })
-      .catch(console.error);
+    fetch("/api/projects").then((r) => (r.ok ? r.json() : [])).then(setProjects).catch(console.error);
+    fetch("/api/users").then((r) => {
+      if (r.status === 403 || !r.ok) return null;
+      setIsAdmin(true);
+      return r.json();
+    }).then((data) => { if (data) setUsers(data); }).catch(console.error);
   }, []);
 
   async function createProject() {
     if (!form.name || !form.bizonId || !form.apiToken) return;
     setCreating(true);
     try {
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      const res = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
       if (res.ok) {
         const project = await res.json();
         setProjects((prev) => [project, ...prev]);
@@ -69,9 +60,7 @@ export default function SettingsPage() {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
-    } finally {
-      setCreating(false);
-    }
+    } finally { setCreating(false); }
   }
 
   async function deleteProject(id: string, name: string) {
@@ -80,55 +69,33 @@ export default function SettingsPage() {
     try {
       const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
       if (res.ok) setProjects((prev) => prev.filter((p) => p.id !== id));
-    } finally {
-      setDeletingId(null);
-    }
+    } finally { setDeletingId(null); }
   }
 
   async function toggleAccess(user: TgUser) {
     setUpdatingId(user.id);
     try {
-      const res = await fetch(`/api/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hasAccess: !user.hasAccess }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-      }
-    } finally {
-      setUpdatingId(null);
-    }
+      const res = await fetch(`/api/users/${user.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hasAccess: !user.hasAccess }) });
+      if (res.ok) { const u = await res.json(); setUsers((prev) => prev.map((x) => x.id === u.id ? u : x)); }
+    } finally { setUpdatingId(null); }
   }
 
   async function toggleAdmin(user: TgUser) {
     setUpdatingId(user.id);
     try {
-      const res = await fetch(`/api/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isAdmin: !user.isAdmin }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-      }
-    } finally {
-      setUpdatingId(null);
-    }
+      const res = await fetch(`/api/users/${user.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isAdmin: !user.isAdmin }) });
+      if (res.ok) { const u = await res.json(); setUsers((prev) => prev.map((x) => x.id === u.id ? u : x)); }
+    } finally { setUpdatingId(null); }
   }
 
   async function deleteUser(user: TgUser) {
-    const displayName = user.firstName ?? user.username ?? user.telegramId;
-    if (!confirm(`Удалить пользователя "${displayName}"?`)) return;
+    const name = user.firstName ?? user.username ?? user.telegramId;
+    if (!confirm(`Удалить пользователя "${name}"?`)) return;
     setUpdatingId(user.id);
     try {
       const res = await fetch(`/api/users/${user.id}`, { method: "DELETE" });
       if (res.ok) setUsers((prev) => prev.filter((u) => u.id !== user.id));
-    } finally {
-      setUpdatingId(null);
-    }
+    } finally { setUpdatingId(null); }
   }
 
   async function logout() {
@@ -137,168 +104,119 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-2xl">
-      <div className="flex items-start justify-between">
+    <div style={{ maxWidth: 840 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 22 }}>
         <div>
-          <h1 className="text-2xl font-bold text-white">Настройки</h1>
-          <p className="text-gray-400 mt-1">Управление проектами Bizon365</p>
+          <h2 style={{ margin: "0 0 3px", fontSize: 21, fontWeight: 700, letterSpacing: "-0.015em", color: "var(--text)" }}>Настройки</h2>
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)" }}>Управление проектами Bizon365</p>
         </div>
-        <button
-          onClick={logout}
-          className="flex items-center gap-2 text-gray-400 hover:text-red-400 border border-gray-700 hover:border-red-700 px-3 py-2 rounded-lg text-sm transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
+        <button onClick={logout} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 16px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: "var(--red)" }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
           Выйти
         </button>
       </div>
 
-      {/* Существующие проекты */}
-      {projects.length > 0 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <h2 className="font-semibold text-white mb-4">Подключённые проекты</h2>
-          <div className="space-y-3">
-            {projects.map((p) => (
-              <div key={p.id} className="flex items-center gap-4 p-3 bg-gray-800 rounded-lg">
-                <div className="w-8 h-8 bg-violet-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <span className="text-violet-400 font-bold text-sm">{p.name[0].toUpperCase()}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+        {/* Connected projects */}
+        {projects.length > 0 && (
+          <div style={card}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15.5, fontWeight: 700, color: "var(--text)" }}>Подключённые проекты</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {projects.map((p) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: 14, border: "1px solid var(--border)", borderRadius: 12, background: "var(--soft)" }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 11, background: "var(--accent)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
+                    {p.name[0].toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14.5, fontWeight: 700, color: "var(--text)" }}>{p.name}</div>
+                    <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Bizon ID {p.bizonId} · {p._count.webinars} вебинаров · {p._count.leads} лидов</div>
+                  </div>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "var(--green)", background: "var(--greenbg)", padding: "5px 11px", borderRadius: 20 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--green)", display: "inline-block" }} />Активен
+                  </span>
+                  <button onClick={() => deleteProject(p.id, p.name)} disabled={deletingId === p.id} style={{ color: "var(--muted)", background: "transparent", border: "none", cursor: "pointer", padding: 6, opacity: deletingId === p.id ? 0.4 : 1 }}>
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white">{p.name}</p>
-                  <p className="text-xs text-gray-500">
-                    Bizon ID: {p.bizonId} · {p._count.webinars} вебинаров · {p._count.leads} лидов
-                  </p>
-                </div>
-                <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                <button
-                  onClick={() => deleteProject(p.id, p.name)}
-                  disabled={deletingId === p.id}
-                  className="text-gray-600 hover:text-red-400 transition-colors disabled:opacity-40 flex-shrink-0"
-                  title="Удалить проект"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Добавить проект */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-        <h2 className="font-semibold text-white mb-4">
-          <Plus className="w-4 h-4 inline mr-2" />
-          Подключить проект Bizon365
-        </h2>
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm text-gray-400 mb-1.5 block">Название проекта</label>
-            <input
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Мой вебинарный проект"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
-            />
+        {/* Add project */}
+        <div style={card}>
+          <h3 style={{ margin: "0 0 16px", fontSize: 15.5, fontWeight: 700, color: "var(--text)" }}>Подключить проект Bizon365</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>
+              <label style={labelStyle}>Название проекта</label>
+              <input style={inputStyle} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Мой вебинарный проект" />
+            </div>
+            <div>
+              <label style={labelStyle}>ID проекта Bizon365</label>
+              <input style={inputStyle} value={form.bizonId} onChange={(e) => setForm((f) => ({ ...f, bizonId: e.target.value }))} placeholder="175423" />
+              <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--muted)" }}>Из URL: start.bizon365.ru/my/<b>XXXX</b>/project</p>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>API Token</label>
+              <input type="password" style={inputStyle} value={form.apiToken} onChange={(e) => setForm((f) => ({ ...f, apiToken: e.target.value }))} placeholder="Токен из Bizon ID → Безопасность" />
+              <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--muted)" }}>Bizon365 → Биzon ID → Безопасность → API Token</p>
+            </div>
           </div>
-          <div>
-            <label className="text-sm text-gray-400 mb-1.5 block">ID проекта Bizon365</label>
-            <input
-              value={form.bizonId}
-              onChange={(e) => setForm((f) => ({ ...f, bizonId: e.target.value }))}
-              placeholder="12345"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Из URL: start.bizon365.ru/my/<strong>XXXX</strong>/project
-            </p>
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 mb-1.5 block">API Token</label>
-            <input
-              type="password"
-              value={form.apiToken}
-              onChange={(e) => setForm((f) => ({ ...f, apiToken: e.target.value }))}
-              placeholder="Токен из Bizon ID → Безопасность"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Bizon365 → Биzon ID → Безопасность → API Token
-            </p>
-          </div>
-          <button
-            onClick={createProject}
-            disabled={creating || !form.name || !form.bizonId || !form.apiToken}
-            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
+          <button onClick={createProject} disabled={creating || !form.name || !form.bizonId || !form.apiToken} style={{ marginTop: 18, cursor: "pointer", background: "var(--accent)", border: "none", borderRadius: 10, padding: "11px 20px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: "#fff", opacity: (!form.name || !form.bizonId || !form.apiToken) ? 0.5 : 1 }}>
             {saved ? "Подключено ✓" : creating ? "Подключение..." : "Подключить"}
           </button>
         </div>
-      </div>
 
-      {/* Пользователи (только для админа) */}
-      {isAdmin && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <h2 className="font-semibold text-white mb-4">Пользователи</h2>
-          {users.length === 0 ? (
-            <p className="text-gray-500 text-sm">Нет зарегистрированных пользователей</p>
-          ) : (
-            <div className="space-y-2">
-              {users.map((u) => {
-                const name = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.username || u.telegramId;
-                return (
-                  <div key={u.id} className="flex items-center gap-3 p-3 bg-gray-800 rounded-lg">
-                    {u.photoUrl ? (
-                      <img src={u.photoUrl} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
-                    ) : (
-                      <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-gray-400 text-xs flex-shrink-0">
-                        {(name[0] ?? "?").toUpperCase()}
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{name}</p>
-                      <p className="text-xs text-gray-500">ID: {u.telegramId}{u.username ? ` · @${u.username}` : ""}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${u.hasAccess ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"}`}>
-                        {u.hasAccess ? "Доступ" : "Нет доступа"}
-                      </span>
-                      {u.isAdmin && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-400">Админ</span>
+        {/* Users */}
+        {isAdmin && (
+          <div style={card}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 15.5, fontWeight: 700, color: "var(--text)" }}>Пользователи</h3>
+            {users.length === 0 ? (
+              <p style={{ fontSize: 13, color: "var(--muted)" }}>Нет зарегистрированных пользователей</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {users.map((u) => {
+                  const name = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.username || u.telegramId;
+                  return (
+                    <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 13, padding: "13px 14px", border: "1px solid var(--border)", borderRadius: 12 }}>
+                      {u.photoUrl ? (
+                        <img src={u.photoUrl} alt="" style={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg,#8b7bff,#6d5cff)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>
+                          {(name[0] ?? "?").toUpperCase()}
+                        </div>
                       )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{name}</div>
+                        <div style={{ fontSize: 12.5, color: "var(--muted)" }}>ID {u.telegramId}{u.username ? ` · @${u.username}` : ""}</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: u.hasAccess ? "var(--green)" : "var(--red)", background: u.hasAccess ? "var(--greenbg)" : "var(--redbg)", padding: "4px 10px", borderRadius: 20 }}>
+                          {u.hasAccess ? "Доступ" : "Нет доступа"}
+                        </span>
+                        {u.isAdmin && (
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", background: "color-mix(in srgb, var(--accent) 10%, transparent)", padding: "4px 10px", borderRadius: 20 }}>Админ</span>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: 2 }}>
+                        {[
+                          { icon: u.hasAccess ? <UserX size={15} /> : <UserCheck size={15} />, title: u.hasAccess ? "Закрыть доступ" : "Открыть доступ", action: () => toggleAccess(u) },
+                          { icon: u.isAdmin ? <ShieldOff size={15} /> : <ShieldCheck size={15} />, title: u.isAdmin ? "Убрать админа" : "Сделать админом", action: () => toggleAdmin(u) },
+                          { icon: <Trash2 size={15} />, title: "Удалить", action: () => deleteUser(u) },
+                        ].map((btn, i) => (
+                          <button key={i} onClick={btn.action} disabled={updatingId === u.id} title={btn.title} style={{ padding: 6, color: "var(--muted)", background: "transparent", border: "none", cursor: "pointer", borderRadius: 6, opacity: updatingId === u.id ? 0.4 : 1 }}>
+                            {btn.icon}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => toggleAccess(u)}
-                        disabled={updatingId === u.id}
-                        title={u.hasAccess ? "Закрыть доступ" : "Открыть доступ"}
-                        className="p-1.5 text-gray-500 hover:text-yellow-400 transition-colors disabled:opacity-40"
-                      >
-                        {u.hasAccess ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                      </button>
-                      <button
-                        onClick={() => toggleAdmin(u)}
-                        disabled={updatingId === u.id}
-                        title={u.isAdmin ? "Убрать админа" : "Сделать админом"}
-                        className="p-1.5 text-gray-500 hover:text-violet-400 transition-colors disabled:opacity-40"
-                      >
-                        {u.isAdmin ? <ShieldOff className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                      </button>
-                      <button
-                        onClick={() => deleteUser(u)}
-                        disabled={updatingId === u.id}
-                        title="Удалить"
-                        className="p-1.5 text-gray-500 hover:text-red-400 transition-colors disabled:opacity-40"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

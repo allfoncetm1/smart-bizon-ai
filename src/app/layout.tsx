@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Golos_Text } from "next/font/google";
 import "./globals.css";
 import { SidebarWrapper } from "@/components/sidebar-wrapper";
 
-const inter = Inter({ subsets: ["latin", "cyrillic"] });
+const golos = Golos_Text({
+  subsets: ["latin", "cyrillic"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-golos",
+});
 
 export const metadata: Metadata = {
   title: "Smart Bizon AI — AI Webinar Agent",
@@ -17,7 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru">
-      <body className={`${inter.className} bg-gray-950 text-gray-100 min-h-screen`}>
+      <body className={`${golos.className} min-h-screen`} style={{ background: "var(--bg)", color: "var(--text)", WebkitFontSmoothing: "antialiased" }}>
         <SidebarWrapper>{children}</SidebarWrapper>
       </body>
     </html>

@@ -1,8 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #030712;
-  --foreground: #f9fafb;
+  --accent: #6d5cff;
+  --bg: #f3f3f7;
+  --card: #ffffff;
+  --border: #ecebf2;
+  --line: #f1f0f6;
+  --text: #171622;
+  --muted: #6f6e7e;
+  --soft: #f7f7fb;
+  --green: #16a34a;
+  --greenbg: #e8f6ec;
+  --red: #e1483a;
+  --redbg: #fbeae8;
+  --amber: #d97706;
+  --amberbg: #fbf0dc;
+  --blue: #2f6fed;
+  --bluebg: #e9f0fe;
 }
 
 * {
@@ -10,12 +24,18 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--text);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #dddce6; border-radius: 8px; border: 3px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: #cfced9; }
+
+@keyframes sbPulse {
+  0% { box-shadow: 0 0 0 0 rgba(22,163,74,.45); }
+  70% { box-shadow: 0 0 0 7px rgba(22,163,74,0); }
+  100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); }
 }
+
+@keyframes sbSpin { to { transform: rotate(360deg); } }

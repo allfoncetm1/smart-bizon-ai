@@ -23,23 +23,23 @@ function LoginContent() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-10 flex flex-col items-center gap-6 max-w-sm w-full">
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-14 h-14 bg-violet-600 rounded-2xl flex items-center justify-center text-2xl font-bold text-white">B</div>
-          <h1 className="text-xl font-bold text-white">Smart Bizon AI</h1>
-          <p className="text-gray-400 text-sm text-center">Войдите через Telegram для доступа к платформе</p>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
+      <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 20, padding: 40, display: "flex", flexDirection: "column", alignItems: "center", gap: 24, maxWidth: 360, width: "100%", boxShadow: "0 4px 24px rgba(109,92,255,.08)" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 56, height: 56, background: "linear-gradient(135deg,#8b7bff,#6d5cff)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 800, color: "#fff" }}>SB</div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", margin: 0 }}>Smart Bizon AI</h1>
+          <p style={{ fontSize: 13.5, color: "var(--muted)", textAlign: "center", margin: 0, lineHeight: 1.5 }}>Войдите через Telegram для доступа к платформе</p>
         </div>
 
         {denied && (
-          <div className="w-full bg-red-900/30 border border-red-700 text-red-300 rounded-lg px-4 py-3 text-sm text-center">
+          <div style={{ width: "100%", background: "var(--redbg)", border: "1px solid color-mix(in srgb, var(--red) 30%, transparent)", color: "var(--red)", borderRadius: 10, padding: "12px 16px", fontSize: 13.5, textAlign: "center" }}>
             Доступ не выдан. Обратитесь к администратору.
           </div>
         )}
 
         <div ref={containerRef} />
 
-        <p className="text-gray-600 text-xs text-center">
+        <p style={{ fontSize: 11.5, color: "var(--muted)", textAlign: "center", margin: 0 }}>
           Доступ предоставляется администратором после авторизации
         </p>
       </div>

@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
+import { TopBar } from "./topbar";
 
 export function SidebarWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -13,9 +14,14 @@ export function SidebarWrapper({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div style={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
-      <main className="flex-1 ml-64 p-8">{children}</main>
+      <div style={{ flex: 1, marginLeft: 262, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <TopBar />
+        <main style={{ flex: 1, overflowY: "auto", padding: "24px 28px 40px" }}>
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

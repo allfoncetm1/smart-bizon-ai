@@ -6,7 +6,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, PieChart, Pie, Legend,
 } from "recharts";
-import { cn } from "@/lib/utils";
 
 interface WebinarRow {
   name: string;
@@ -24,15 +23,7 @@ interface WebinarRow {
 }
 
 interface AnalyticsData {
-  totals: {
-    viewers: number;
-    messages: number;
-    spam: number;
-    questions: number;
-    hotLeads: number;
-    warmLeads: number;
-    coldLeads: number;
-  };
+  totals: { viewers: number; messages: number; spam: number; questions: number; hotLeads: number; warmLeads: number; coldLeads: number };
   totalLeads: number;
   avgConversion: number;
   webinarCount: number;
@@ -41,37 +32,27 @@ interface AnalyticsData {
 }
 
 const SEGMENT_COLORS: Record<string, string> = {
-  HOT: "#ef4444",
-  WARM: "#eab308",
-  COLD: "#3b82f6",
+  HOT: "#e1483a",
+  WARM: "#d97706",
+  COLD: "#2f6fed",
 };
 
 const SEGMENT_LABELS: Record<string, string> = {
-  HOT: "🔥 Горячие",
-  WARM: "⚡ Тёплые",
-  COLD: "❄️ Холодные",
+  HOT: "Горячие",
+  WARM: "Тёплые",
+  COLD: "Холодные",
 };
-
-function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) {
-  return (
-    <div className={cn("bg-gray-900 border rounded-xl p-4", color)}>
-      <p className="text-xs text-gray-400 mb-1">{label}</p>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
-    </div>
-  );
-}
 
 const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { color: string; name: string; value: number }[]; label?: string }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs shadow-xl">
-      <p className="text-gray-300 mb-2 font-medium">{label}</p>
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,.08)" }}>
+      <p style={{ color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>{label}</p>
       {payload.map((p) => (
-        <div key={p.name} className="flex items-center gap-2 mb-1">
-          <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-          <span className="text-gray-400">{p.name}:</span>
-          <span className="text-white font-medium">{p.value}</span>
+        <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color, display: "inline-block" }} />
+          <span style={{ color: "var(--muted)" }}>{p.name}:</span>
+          <span style={{ color: "var(--text)", fontWeight: 600 }}>{p.value}</span>
         </div>
       ))}
     </div>
@@ -94,223 +75,169 @@ export default function AnalyticsPage() {
   }, []);
 
   if (!data) {
-    return <div className="flex items-center justify-center min-h-[60vh] text-gray-500">Загрузка...</div>;
+    return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", color: "var(--muted)", fontSize: 14 }}>Загрузка...</div>;
   }
 
   const { totals, totalLeads, avgConversion, webinarCount, segmentStats, chartData } = data;
-
   const spamPct = totals.messages > 0 ? ((totals.spam / totals.messages) * 100).toFixed(1) : "0";
-  const engagementPct = totals.viewers > 0 ? ((totals.messages / totals.viewers)).toFixed(1) : "0";
+  const engagementPct = totals.viewers > 0 ? (totals.messages / totals.viewers).toFixed(1) : "0";
+  const funnelMax = totals.viewers || 1;
 
   const pieData = segmentStats.map((s) => ({
     name: SEGMENT_LABELS[s.segment] ?? s.segment,
     value: s._count,
-    color: SEGMENT_COLORS[s.segment] ?? "#6b7280",
+    color: SEGMENT_COLORS[s.segment] ?? "#a3a2b0",
   }));
 
-  const funnelSteps = [
-    { label: "Зрители", value: totals.viewers, color: "bg-gray-600" },
-    { label: "Тёплые+Горячие", value: totals.hotLeads + totals.warmLeads, color: "bg-yellow-500" },
-    { label: "Горячие", value: totals.hotLeads, color: "bg-red-500" },
-  ];
-  const funnelMax = totals.viewers || 1;
+  const card = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, padding: 16 } as const;
+  const card16 = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, boxShadow: "0 1px 2px rgba(20,20,50,.04)" } as const;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Аналитика</h1>
-        <p className="text-gray-400 mt-1">Сводная статистика по всем вебинарам</p>
+    <div>
+      <div style={{ marginBottom: 22 }}>
+        <h2 style={{ margin: "0 0 3px", fontSize: 21, fontWeight: 700, letterSpacing: "-0.015em", color: "var(--text)" }}>Аналитика</h2>
+        <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)" }}>Сводная статистика по всем вебинарам</p>
       </div>
 
-      {/* KPI карточки */}
-      <div className="grid grid-cols-6 gap-3">
-        <StatCard label="Вебинаров" value={webinarCount} color="border-gray-800" />
-        <StatCard label="Зрителей" value={totals.viewers.toLocaleString()} color="border-gray-800" />
-        <StatCard label="Лидов" value={totalLeads.toLocaleString()} color="border-gray-800" />
-        <StatCard label="Горячих" value={totals.hotLeads} sub={`${totalLeads > 0 ? ((totals.hotLeads / totalLeads) * 100).toFixed(1) : 0}% от лидов`} color="border-red-500/20" />
-        <StatCard label="Тёплых" value={totals.warmLeads} sub={`${totalLeads > 0 ? ((totals.warmLeads / totalLeads) * 100).toFixed(1) : 0}% от лидов`} color="border-yellow-500/20" />
-        <StatCard label="Ср. конверсия" value={`${avgConversion}%`} sub="горячих от зрителей" color="border-violet-500/20" />
+      {/* KPI */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginBottom: 22 }}>
+        {[
+          { label: "Вебинаров", value: webinarCount, color: "var(--text)" },
+          { label: "Зрителей", value: totals.viewers, color: "var(--text)" },
+          { label: "Лидов", value: totalLeads, color: "var(--text)" },
+          { label: "Горячих", value: totals.hotLeads, color: "var(--red)", sub: `${totalLeads > 0 ? ((totals.hotLeads / totalLeads) * 100).toFixed(1) : 0}% от лидов` },
+          { label: "Тёплых", value: totals.warmLeads, color: "var(--amber)", sub: `${totalLeads > 0 ? ((totals.warmLeads / totalLeads) * 100).toFixed(1) : 0}% от лидов` },
+          { label: "Ср. конверсия", value: `${avgConversion}%`, color: "var(--accent)", sub: "горячих от зрителей" },
+        ].map((item) => (
+          <div key={item.label} style={card}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)" }}>{item.label}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, marginTop: 8, color: item.color }}>{item.value}</div>
+            {"sub" in item && item.sub && <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>{item.sub}</div>}
+          </div>
+        ))}
       </div>
 
-      {/* Воронка + Сегменты */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Воронка */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <h2 className="font-semibold text-white mb-5">Воронка конверсии</h2>
-          <div className="space-y-3">
-            {funnelSteps.map((step, i) => {
-              const pct = Math.round((step.value / funnelMax) * 100);
-              const prevValue = i > 0 ? funnelSteps[i - 1].value : funnelMax;
-              const dropPct = prevValue > 0 ? Math.round((1 - step.value / prevValue) * 100) : 0;
-              return (
-                <div key={step.label}>
-                  <div className="flex justify-between text-sm mb-1.5">
-                    <span className="text-gray-300">{step.label}</span>
-                    <div className="flex items-center gap-3">
-                      {i > 0 && dropPct > 0 && (
-                        <span className="text-xs text-red-400">−{dropPct}%</span>
-                      )}
-                      <span className="font-medium text-white">{step.value.toLocaleString()}</span>
-                    </div>
-                  </div>
-                  <div className="h-7 bg-gray-800 rounded-lg overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-lg transition-all flex items-center px-2", step.color)}
-                      style={{ width: `${Math.max(pct, 2)}%` }}
-                    >
-                      {pct > 10 && <span className="text-xs text-white font-medium">{pct}%</span>}
-                    </div>
-                  </div>
+      {/* Funnel + Segments */}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 360px", gap: 22, marginBottom: 22 }}>
+        <div style={card16}>
+          <h3 style={{ margin: "0 0 18px", fontSize: 15.5, fontWeight: 700, color: "var(--text)" }}>Воронка конверсии</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {[
+              { label: "Зрители", value: totals.viewers, pct: 100, color: "var(--blue)" },
+              { label: "Тёплые + Горячие", value: totals.hotLeads + totals.warmLeads, pct: Math.round(((totals.hotLeads + totals.warmLeads) / funnelMax) * 100), color: "var(--amber)" },
+              { label: "Горячие", value: totals.hotLeads, pct: Math.round((totals.hotLeads / funnelMax) * 100), color: "var(--red)" },
+            ].map((step) => (
+              <div key={step.label}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{step.label}</span>
+                  <span style={{ fontSize: 13, color: "var(--muted)" }}>{step.value} · {step.pct}%</span>
                 </div>
-              );
-            })}
+                <div style={{ height: 34, borderRadius: 9, background: step.color, width: `${Math.max(step.pct, 4)}%` }} />
+              </div>
+            ))}
           </div>
         </div>
-
-        {/* Сегменты Pie */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <h2 className="font-semibold text-white mb-2">Сегментация лидов</h2>
+        <div style={card16}>
+          <h3 style={{ margin: "0 0 16px", fontSize: 15.5, fontWeight: 700, color: "var(--text)" }}>Сегментация лидов</h3>
           {pieData.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-gray-500 text-sm">Нет данных</div>
+            <div style={{ textAlign: "center", color: "var(--muted)", padding: "32px 0", fontSize: 13 }}>Нет данных</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {pieData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
+                  {pieData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
                 </Pie>
-                <Tooltip
-                  contentStyle={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8 }}
-                  itemStyle={{ color: "#e5e7eb" }}
-                />
-                <Legend
-                  iconType="circle"
-                  iconSize={8}
-                  formatter={(v) => <span style={{ color: "#9ca3af", fontSize: 12 }}>{v}</span>}
-                />
+                <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} itemStyle={{ color: "var(--text)" }} />
+                <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: "var(--muted)", fontSize: 12 }}>{v}</span>} />
               </PieChart>
             </ResponsiveContainer>
           )}
         </div>
       </div>
 
-      {/* Перформанс вебинаров */}
+      {/* Extra metrics */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 22 }}>
+        <div style={card}><div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 6 }}>Активность чата</div><div style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>{engagementPct}</div><div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>сообщений на зрителя</div></div>
+        <div style={card}><div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 6 }}>Спам в чате</div><div style={{ fontSize: 24, fontWeight: 700, color: "var(--green)" }}>{spamPct}%</div><div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>{totals.spam} сообщений отфильтровано</div></div>
+        <div style={card}><div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 6 }}>Вопросов участников</div><div style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>{totals.questions}</div><div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>обработано AI агентом</div></div>
+      </div>
+
+      {/* Chart */}
       {chartData.length > 0 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-white">Перформанс вебинаров</h2>
-            <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
+        <div style={{ ...card16, marginBottom: 22 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <div>
+              <h3 style={{ margin: "0 0 6px", fontSize: 15.5, fontWeight: 700, color: "var(--text)" }}>Перформанс вебинаров</h3>
+              <div style={{ display: "flex", gap: 18, fontSize: 12, color: "var(--muted)" }}>
+                {[{ color: "var(--blue)", label: "Зрители" }, { color: "var(--amber)", label: "Тёплые" }, { color: "var(--red)", label: "Горячие" }].map((l) => (
+                  <span key={l.label} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: l.color, display: "inline-block" }} />{l.label}</span>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 4, background: "var(--soft)", border: "1px solid var(--border)", borderRadius: 9, padding: 4 }}>
               {(["leads", "chat"] as const).map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setActiveChart(c)}
-                  className={cn("px-3 py-1 rounded-md text-xs font-medium transition-colors",
-                    activeChart === c ? "bg-violet-600 text-white" : "text-gray-400 hover:text-white"
-                  )}
-                >
+                <button key={c} onClick={() => setActiveChart(c)} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit", background: activeChart === c ? "var(--accent)" : "transparent", color: activeChart === c ? "#fff" : "var(--muted)" }}>
                   {c === "leads" ? "Лиды" : "Чат"}
                 </button>
               ))}
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={230}>
             {activeChart === "leads" ? (
               <BarChart data={chartData} barGap={4} barCategoryGap="30%">
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
+                <XAxis dataKey="date" tick={{ fill: "#a3a2b0", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#a3a2b0", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend formatter={(v) => <span style={{ color: "#9ca3af", fontSize: 11 }}>{v}</span>} />
-                <Bar dataKey="viewers" name="Зрители" fill="#4b5563" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="warm" name="Тёплые" fill="#eab308" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="hot" name="Горячие" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="viewers" name="Зрители" fill="#2f6fed" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="warm" name="Тёплые" fill="#d97706" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="hot" name="Горячие" fill="#e1483a" radius={[4, 4, 0, 0]} />
               </BarChart>
             ) : (
               <BarChart data={chartData} barGap={4} barCategoryGap="30%">
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
+                <XAxis dataKey="date" tick={{ fill: "#a3a2b0", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#a3a2b0", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend formatter={(v) => <span style={{ color: "#9ca3af", fontSize: 11 }}>{v}</span>} />
-                <Bar dataKey="messages" name="Сообщений" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="questions" name="Вопросов" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="spam" name="Спам" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="messages" name="Сообщений" fill="#6d5cff" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="questions" name="Вопросов" fill="#8b7bff" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="spam" name="Спам" fill="#e1483a" radius={[4, 4, 0, 0]} />
               </BarChart>
             )}
           </ResponsiveContainer>
         </div>
       )}
 
-      {/* Доп. метрики */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <p className="text-xs text-gray-400 mb-1">Активность чата</p>
-          <p className="text-xl font-bold text-white">{engagementPct}</p>
-          <p className="text-xs text-gray-500 mt-1">сообщений на зрителя</p>
-        </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <p className="text-xs text-gray-400 mb-1">Спам в чате</p>
-          <p className="text-xl font-bold text-red-400">{spamPct}%</p>
-          <p className="text-xs text-gray-500 mt-1">{totals.spam} сообщений отфильтровано</p>
-        </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-          <p className="text-xs text-gray-400 mb-1">Вопросов участников</p>
-          <p className="text-xl font-bold text-blue-400">{totals.questions}</p>
-          <p className="text-xs text-gray-500 mt-1">обработано AI агентом</p>
-        </div>
-      </div>
-
-      {/* Таблица */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-800">
-          <h2 className="font-semibold text-white">Все вебинары</h2>
-        </div>
+      {/* Table */}
+      <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "0 1px 2px rgba(20,20,50,.04)", overflow: "hidden" }}>
+        <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 700, padding: "22px 22px 14px", color: "var(--text)" }}>Все вебинары</h3>
         {chartData.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">Нет обработанных вебинаров</div>
+          <div style={{ textAlign: "center", padding: "48px 24px", color: "var(--muted)", fontSize: 14 }}>Нет обработанных вебинаров</div>
         ) : (
-          <table className="w-full">
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Вебинар</th>
-                <th className="text-right text-xs text-gray-400 font-medium px-4 py-3">👥</th>
-                <th className="text-right text-xs text-gray-400 font-medium px-4 py-3">🔥</th>
-                <th className="text-right text-xs text-gray-400 font-medium px-4 py-3">⚡</th>
-                <th className="text-right text-xs text-gray-400 font-medium px-4 py-3">💬</th>
-                <th className="text-right text-xs text-gray-400 font-medium px-4 py-3">Конверсия</th>
-                <th className="text-right text-xs text-gray-400 font-medium px-4 py-3"></th>
+              <tr style={{ borderBottom: "1px solid var(--line)" }}>
+                {["Вебинар", "Зрит.", "🔥", "⚡", "Чат", "Конв.", ""].map((h, i) => (
+                  <th key={i} style={{ textAlign: i === 0 ? "left" : "right", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#a3a2b0", padding: "0 22px 8px" }}>{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody>
               {chartData.map((w) => (
-                <tr key={w.id} className="hover:bg-gray-800/50 transition-colors">
-                  <td className="px-5 py-3">
-                    <p className="text-sm text-white truncate max-w-xs">{w.fullTitle}</p>
-                    <p className="text-xs text-gray-500">{w.date}</p>
+                <tr key={w.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                  <td style={{ padding: "13px 22px" }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 340 }}>{w.fullTitle}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>{w.date}</div>
                   </td>
-                  <td className="px-4 py-3 text-right text-sm text-gray-300">{w.viewers}</td>
-                  <td className="px-4 py-3 text-right text-sm text-red-400 font-medium">{w.hot}</td>
-                  <td className="px-4 py-3 text-right text-sm text-yellow-400">{w.warm}</td>
-                  <td className="px-4 py-3 text-right text-sm text-gray-400">{w.messages}</td>
-                  <td className="px-4 py-3 text-right">
-                    <span className={cn("text-sm font-medium",
-                      w.conversion > 5 ? "text-green-400" : w.conversion > 1 ? "text-yellow-400" : "text-gray-400"
-                    )}>
-                      {w.conversion}%
-                    </span>
+                  <td style={{ textAlign: "right", fontSize: 13.5, fontWeight: 600, color: "var(--text)", padding: "13px 22px" }}>{w.viewers}</td>
+                  <td style={{ textAlign: "right", fontSize: 13, fontWeight: 600, color: "var(--red)", padding: "13px 22px" }}>{w.hot}</td>
+                  <td style={{ textAlign: "right", fontSize: 13, fontWeight: 600, color: "var(--amber)", padding: "13px 22px" }}>{w.warm}</td>
+                  <td style={{ textAlign: "right", fontSize: 13, color: "var(--muted)", padding: "13px 22px" }}>{w.messages}</td>
+                  <td style={{ textAlign: "right", padding: "13px 22px" }}>
+                    <span style={{ display: "inline-flex", fontSize: 12, fontWeight: 700, color: w.conversion > 5 ? "var(--green)" : w.conversion > 1 ? "var(--amber)" : "var(--muted)", background: w.conversion > 5 ? "var(--greenbg)" : w.conversion > 1 ? "var(--amberbg)" : "var(--soft)", padding: "3px 9px", borderRadius: 20 }}>{w.conversion}%</span>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/webinars/${w.id}`} className="text-xs text-violet-400 hover:text-violet-300">
-                      →
-                    </Link>
+                  <td style={{ textAlign: "right", padding: "13px 22px" }}>
+                    <Link href={`/webinars/${w.id}`} style={{ fontSize: 13, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>→</Link>
                   </td>
                 </tr>
               ))}

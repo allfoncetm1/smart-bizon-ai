@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 
 interface ChatMessage {
   id: string;
@@ -61,17 +60,17 @@ interface Webinar {
   participants: Participant[];
 }
 
-const segmentBadge: Record<string, string> = {
-  HOT: "bg-red-500/10 text-red-400 border border-red-500/20",
-  WARM: "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20",
-  COLD: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+const segmentColors: Record<string, { color: string; bg: string; dot: string }> = {
+  HOT: { color: "var(--red)", bg: "var(--redbg)", dot: "var(--red)" },
+  WARM: { color: "var(--amber)", bg: "var(--amberbg)", dot: "var(--amber)" },
+  COLD: { color: "var(--blue)", bg: "var(--bluebg)", dot: "var(--blue)" },
 };
 
-const segmentEmoji: Record<string, string> = {
-  HOT: "🔥", WARM: "⚡", COLD: "❄️",
-};
+const segmentEmoji: Record<string, string> = { HOT: "🔥", WARM: "⚡", COLD: "❄️" };
 
 type Tab = "overview" | "chat" | "questions" | "leads";
+
+const card: React.CSSProperties = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, padding: 20, boxShadow: "0 1px 2px rgba(20,20,50,.04)" };
 
 export default function WebinarDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -84,56 +83,39 @@ export default function WebinarDetailPage() {
   const [copiedPhrase, setCopiedPhrase] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/webinars/${id}`)
-      .then((r) => r.json())
-      .then(setWebinar);
+    fetch(`/api/webinars/${id}`).then((r) => r.json()).then(setWebinar);
   }, [id]);
 
   if (!webinar) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-500">Загрузка...</p>
-      </div>
-    );
+    return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", color: "var(--muted)", fontSize: 14 }}>Загрузка...</div>;
   }
 
   const a = webinar.analytics;
-
   const filteredMessages = webinar.chatMessages.filter((m) => {
     if (chatFilter === "spam") return m.isSpam;
     if (chatFilter === "toxic") return m.isToxic;
     if (chatFilter === "questions") return m.isQuestion;
     return true;
   });
-
   const questions = webinar.chatMessages.filter((m) => m.isQuestion);
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div style={{ maxWidth: 960 }}>
       {/* Header */}
-      <div className="flex items-start gap-4">
-        <Link href="/webinars" className="text-gray-400 hover:text-white mt-1">
-          <ArrowLeft className="w-5 h-5" />
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 22 }}>
+        <Link href="/webinars" style={{ color: "var(--muted)", marginTop: 2, flexShrink: 0 }}>
+          <ArrowLeft size={20} />
         </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-white truncate">{webinar.title}</h1>
-          <p className="text-gray-400 text-sm mt-0.5">
-            {new Date(webinar.createdAt).toLocaleDateString("ru-RU")} · {webinar.viewersCount} зрителей
-          </p>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 style={{ margin: "0 0 3px", fontSize: 20, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{webinar.title}</h2>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>{new Date(webinar.createdAt).toLocaleDateString("ru-RU")} · {webinar.viewersCount} зрителей</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-900 border border-gray-800 rounded-lg p-1 w-fit">
+      <div style={{ display: "flex", gap: 4, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 11, padding: 4, width: "fit-content", marginBottom: 22 }}>
         {(["overview", "chat", "questions", "leads"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={cn(
-              "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-              tab === t ? "bg-violet-600 text-white" : "text-gray-400 hover:text-white"
-            )}
-          >
+          <button key={t} onClick={() => setTab(t)} style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: tab === t ? 600 : 500, border: "none", cursor: "pointer", fontFamily: "inherit", background: tab === t ? "var(--accent)" : "transparent", color: tab === t ? "#fff" : "var(--muted)", transition: "all 0.15s" }}>
             {t === "overview" && "Обзор"}
             {t === "chat" && `Чат (${webinar.chatMessages.length})`}
             {t === "questions" && `Вопросы (${questions.length})`}
@@ -144,68 +126,49 @@ export default function WebinarDetailPage() {
 
       {/* Overview */}
       {tab === "overview" && (
-        <div className="space-y-4">
-          {/* Stats grid */}
-          <div className="grid grid-cols-4 gap-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
             {[
               { label: "Зрителей", value: a?.totalViewers ?? 0, icon: "👥" },
               { label: "Сообщений", value: a?.chatMessagesCount ?? 0, icon: "💬" },
               { label: "Горячих", value: a?.hotLeadsCount ?? 0, icon: "🔥" },
               { label: "Тёплых", value: a?.warmLeadsCount ?? 0, icon: "⚡" },
             ].map((s) => (
-              <div key={s.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                <p className="text-2xl mb-1">{s.icon}</p>
-                <p className="text-xl font-bold text-white">{s.value}</p>
-                <p className="text-xs text-gray-400">{s.label}</p>
+              <div key={s.label} style={card}>
+                <p style={{ fontSize: 22, margin: "0 0 6px" }}>{s.icon}</p>
+                <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", margin: "0 0 2px" }}>{s.value}</p>
+                <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>{s.label}</p>
               </div>
             ))}
           </div>
-
-          {/* Stats row 2 */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-              <p className="text-sm text-gray-400 mb-2">Спам / Токсичность</p>
-              <p className="text-lg font-bold text-red-400">{a?.spamCount ?? 0} сообщений</p>
-              <p className="text-xs text-gray-500 mt-1">удалено AI модератором</p>
-            </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-              <p className="text-sm text-gray-400 mb-2">Вопросы участников</p>
-              <p className="text-lg font-bold text-blue-400">{a?.questionsCount ?? 0} вопросов</p>
-              <p className="text-xs text-gray-500 mt-1">обработано AI агентом</p>
-            </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-              <p className="text-sm text-gray-400 mb-2">Конверсия</p>
-              <p className="text-lg font-bold text-green-400">{a?.conversionRate.toFixed(1) ?? 0}%</p>
-              <p className="text-xs text-gray-500 mt-1">зрителей → горячий лид</p>
-            </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+            <div style={card}><p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 8px" }}>Спам / Токсичность</p><p style={{ fontSize: 18, fontWeight: 700, color: "var(--red)", margin: "0 0 2px" }}>{a?.spamCount ?? 0} сообщений</p><p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>удалено AI модератором</p></div>
+            <div style={card}><p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 8px" }}>Вопросы участников</p><p style={{ fontSize: 18, fontWeight: 700, color: "var(--blue)", margin: "0 0 2px" }}>{a?.questionsCount ?? 0} вопросов</p><p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>обработано AI агентом</p></div>
+            <div style={card}><p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 8px" }}>Конверсия</p><p style={{ fontSize: 18, fontWeight: 700, color: "var(--green)", margin: "0 0 2px" }}>{a?.conversionRate.toFixed(1) ?? 0}%</p><p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>зрителей → горячий лид</p></div>
           </div>
-
-          {/* Сегменты */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <p className="text-sm font-semibold text-white mb-4">Сегментация</p>
-            <div className="grid grid-cols-4 gap-3">
+          <div style={card}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: "0 0 14px" }}>Сегментация</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
               {[
-                { label: "Горячие", value: a?.hotLeadsCount ?? 0, emoji: "🔥", color: "text-red-400" },
-                { label: "Тёплые", value: a?.warmLeadsCount ?? 0, emoji: "⚡", color: "text-yellow-400" },
-                { label: "Холодные", value: a?.coldLeadsCount ?? 0, emoji: "❄️", color: "text-blue-400" },
+                { label: "Горячие", value: a?.hotLeadsCount ?? 0, emoji: "🔥", color: "var(--red)" },
+                { label: "Тёплые", value: a?.warmLeadsCount ?? 0, emoji: "⚡", color: "var(--amber)" },
+                { label: "Холодные", value: a?.coldLeadsCount ?? 0, emoji: "❄️", color: "var(--blue)" },
               ].map((s) => (
-                <div key={s.label} className="text-center p-3 bg-gray-800 rounded-lg">
-                  <p className="text-2xl mb-1">{s.emoji}</p>
-                  <p className={cn("text-xl font-bold", s.color)}>{s.value}</p>
-                  <p className="text-xs text-gray-400">{s.label}</p>
+                <div key={s.label} style={{ textAlign: "center", padding: 12, background: "var(--soft)", borderRadius: 10 }}>
+                  <p style={{ fontSize: 22, margin: "0 0 4px" }}>{s.emoji}</p>
+                  <p style={{ fontSize: 20, fontWeight: 700, color: s.color, margin: "0 0 2px" }}>{s.value}</p>
+                  <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>{s.label}</p>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* AI Summary */}
           {a?.summary && (
-            <div className="bg-gray-900 border border-violet-500/30 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-lg">🤖</span>
-                <p className="font-semibold text-white">AI Резюме</p>
+            <div style={{ background: "color-mix(in srgb, var(--accent) 7%, var(--card))", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)", borderRadius: 16, padding: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 18 }}>🤖</span>
+                <p style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", margin: 0 }}>AI Резюме</p>
               </div>
-              <p className="text-sm text-gray-300 leading-relaxed">{a.summary}</p>
+              <p style={{ fontSize: 13.5, color: "var(--text)", lineHeight: 1.6, margin: 0 }}>{a.summary}</p>
             </div>
           )}
         </div>
@@ -213,67 +176,46 @@ export default function WebinarDetailPage() {
 
       {/* Chat */}
       {tab === "chat" && (
-        <div className="space-y-3">
-          {/* Filter */}
-          <div className="flex gap-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", gap: 6 }}>
             {[
               { key: "all", label: "Все" },
               { key: "questions", label: `❓ Вопросы (${questions.length})` },
               { key: "spam", label: `🚫 Спам (${a?.spamCount ?? 0})` },
               { key: "toxic", label: "☠️ Токсичные" },
             ].map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setChatFilter(f.key as typeof chatFilter)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                  chatFilter === f.key
-                    ? "bg-violet-600 text-white"
-                    : "bg-gray-800 text-gray-400 hover:text-white"
-                )}
-              >
+              <button key={f.key} onClick={() => setChatFilter(f.key as typeof chatFilter)} style={{ padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: chatFilter === f.key ? 600 : 500, border: "none", cursor: "pointer", fontFamily: "inherit", background: chatFilter === f.key ? "var(--accent)" : "var(--soft)", color: chatFilter === f.key ? "#fff" : "var(--muted)", transition: "all 0.15s" }}>
                 {f.label}
               </button>
             ))}
           </div>
-
-          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <div className="max-h-[600px] overflow-y-auto divide-y divide-gray-800">
+          <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ maxHeight: 600, overflowY: "auto" }}>
               {filteredMessages.length === 0 ? (
-                <p className="text-center text-gray-500 py-10">Нет сообщений</p>
-              ) : (
-                filteredMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={cn(
-                      "px-4 py-3 flex gap-3",
-                      msg.isSpam || msg.isToxic ? "bg-red-500/5" : msg.isQuestion ? "bg-violet-500/5" : ""
-                    )}
-                  >
-                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center text-xs text-gray-300">
-                      {(msg.senderName?.[0] ?? "?").toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-xs font-medium text-gray-300">{msg.senderName ?? "Аноним"}</span>
-                        {msg.isSpam && <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">спам</span>}
-                        {msg.isToxic && <span className="text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">токсик</span>}
-                        {msg.isQuestion && <span className="text-xs bg-violet-500/20 text-violet-400 px-1.5 py-0.5 rounded">вопрос</span>}
-                        <span className="text-xs text-gray-600 ml-auto">
-                          {new Date(msg.sentAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-200">{msg.text}</p>
-                      {msg.aiAnswer && (
-                        <div className="mt-2 pl-3 border-l-2 border-violet-500">
-                          <p className="text-xs text-violet-400">🤖 AI ответ:</p>
-                          <p className="text-sm text-gray-300">{msg.aiAnswer}</p>
-                        </div>
-                      )}
-                    </div>
+                <p style={{ textAlign: "center", color: "var(--muted)", padding: "40px 24px", fontSize: 14 }}>Нет сообщений</p>
+              ) : filteredMessages.map((msg) => (
+                <div key={msg.id} style={{ display: "flex", gap: 12, padding: "12px 18px", borderBottom: "1px solid var(--line)", background: msg.isSpam || msg.isToxic ? "color-mix(in srgb, var(--red) 4%, transparent)" : msg.isQuestion ? "color-mix(in srgb, var(--accent) 4%, transparent)" : "transparent" }}>
+                  <div style={{ flexShrink: 0, width: 28, height: 28, borderRadius: "50%", background: "var(--soft)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>
+                    {(msg.senderName?.[0] ?? "?").toUpperCase()}
                   </div>
-                ))
-              )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>{msg.senderName ?? "Аноним"}</span>
+                      {msg.isSpam && <span style={{ fontSize: 11, background: "var(--redbg)", color: "var(--red)", padding: "1px 7px", borderRadius: 10 }}>спам</span>}
+                      {msg.isToxic && <span style={{ fontSize: 11, background: "var(--amberbg)", color: "var(--amber)", padding: "1px 7px", borderRadius: 10 }}>токсик</span>}
+                      {msg.isQuestion && <span style={{ fontSize: 11, background: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)", padding: "1px 7px", borderRadius: 10 }}>вопрос</span>}
+                      <span style={{ fontSize: 11.5, color: "var(--muted)", marginLeft: "auto" }}>{new Date(msg.sentAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                    <p style={{ fontSize: 13.5, color: "var(--text)", margin: 0, lineHeight: 1.5 }}>{msg.text}</p>
+                    {msg.aiAnswer && (
+                      <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: "2px solid var(--accent)" }}>
+                        <p style={{ fontSize: 12, color: "var(--accent)", margin: "0 0 3px" }}>🤖 AI ответ:</p>
+                        <p style={{ fontSize: 13, color: "var(--text)", margin: 0 }}>{msg.aiAnswer}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -281,112 +223,82 @@ export default function WebinarDetailPage() {
 
       {/* Questions */}
       {tab === "questions" && (
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {questions.length === 0 ? (
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-10 text-center text-gray-500">
-              Вопросов не обнаружено
-            </div>
-          ) : (
-            questions.map((q) => (
-              <div key={q.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-violet-400">{q.senderName ?? "Аноним"}</span>
-                  <span className="text-xs text-gray-600">
-                    {new Date(q.sentAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                </div>
-                <p className="text-sm text-white">{q.text}</p>
-                {q.aiAnswer && (
-                  <div className="mt-3 p-3 bg-violet-500/10 rounded-lg border border-violet-500/20">
-                    <p className="text-xs text-violet-400 mb-1">🤖 Ответ AI агента:</p>
-                    <p className="text-sm text-gray-200">{q.aiAnswer}</p>
-                  </div>
-                )}
+            <div style={{ ...card, textAlign: "center", padding: "48px 24px", color: "var(--muted)", fontSize: 14 }}>Вопросов не обнаружено</div>
+          ) : questions.map((q) => (
+            <div key={q.id} style={card}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--accent)" }}>{q.senderName ?? "Аноним"}</span>
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>{new Date(q.sentAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span>
               </div>
-            ))
-          )}
+              <p style={{ fontSize: 13.5, color: "var(--text)", margin: 0, lineHeight: 1.5 }}>{q.text}</p>
+              {q.aiAnswer && (
+                <div style={{ marginTop: 12, padding: "10px 14px", background: "color-mix(in srgb, var(--accent) 8%, transparent)", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--accent) 20%, transparent)" }}>
+                  <p style={{ fontSize: 12, color: "var(--accent)", margin: "0 0 4px" }}>🤖 Ответ AI агента:</p>
+                  <p style={{ fontSize: 13.5, color: "var(--text)", margin: 0 }}>{q.aiAnswer}</p>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
       {/* Participants */}
       {tab === "leads" && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <table className="w-full">
+        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "0 1px 2px rgba(20,20,50,.04)", overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left text-xs text-gray-400 font-medium px-4 py-3">Участник</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-4 py-3">Сегмент</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-4 py-3">Балл</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-4 py-3">Время</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-4 py-3">Страна</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-4 py-3">AI карточка</th>
+              <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                {["Участник", "Сегмент", "Балл", "Время", "Страна", "AI карточка"].map((h) => (
+                  <th key={h} style={{ textAlign: "left", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#a3a2b0", padding: "15px 16px" }}>{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody>
               {webinar.participants.flatMap((p) => {
-                const card = leadCards[p.email];
+                const lcard = leadCards[p.email];
                 const isExpanded = expandedParticipant === p.id;
+                const seg = segmentColors[p.segment] ?? { color: "var(--muted)", bg: "var(--soft)", dot: "var(--muted)" };
 
                 const mainRow = (
-                  <tr
-                    key={p.id}
-                    onClick={async () => {
-                      if (isExpanded) { setExpandedParticipant(null); return; }
-                      setExpandedParticipant(p.id);
-                      if (!leadsLoaded) {
-                        const res = await fetch(`/api/leads?webinarId=${id}&page=1`);
-                        const data = await res.json();
-                        const map: Record<string, ParticipantLead> = {};
-                        for (const lead of data.leads ?? []) {
-                          map[lead.email] = {
-                            painPoints: lead.painPoints ?? [],
-                            objections: lead.objections ?? [],
-                            openingPhrase: lead.openingPhrase ?? null,
-                            recommendedProduct: lead.recommendedProduct ?? null,
-                            aiCardAt: lead.aiCardAt ?? null,
-                            chatMessages: lead.chatMessages ?? [],
-                          };
-                        }
-                        setLeadCards(map);
-                        setLeadsLoaded(true);
+                  <tr key={p.id} onClick={async () => {
+                    if (isExpanded) { setExpandedParticipant(null); return; }
+                    setExpandedParticipant(p.id);
+                    if (!leadsLoaded) {
+                      const res = await fetch(`/api/leads?webinarId=${id}&page=1`);
+                      const data = await res.json();
+                      const map: Record<string, ParticipantLead> = {};
+                      for (const lead of data.leads ?? []) {
+                        map[lead.email] = { painPoints: lead.painPoints ?? [], objections: lead.objections ?? [], openingPhrase: lead.openingPhrase ?? null, recommendedProduct: lead.recommendedProduct ?? null, aiCardAt: lead.aiCardAt ?? null, chatMessages: lead.chatMessages ?? [] };
                       }
-                    }}
-                    className="hover:bg-gray-800/50 cursor-pointer transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-white">{p.name ?? p.email}</p>
-                      {p.phone && <p className="text-xs text-gray-500">{p.phone}</p>}
+                      setLeadCards(map);
+                      setLeadsLoaded(true);
+                    }
+                  }} style={{ borderBottom: "1px solid var(--line)", cursor: "pointer" }}>
+                    <td style={{ padding: "12px 16px" }}>
+                      <p style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", margin: "0 0 2px" }}>{p.name ?? p.email}</p>
+                      {p.phone && <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>{p.phone}</p>}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={cn("text-xs px-2 py-1 rounded-full", segmentBadge[p.segment])}>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: seg.color, background: seg.bg, padding: "3px 9px", borderRadius: 20 }}>
                         {segmentEmoji[p.segment]} {p.segment}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                          <div
-                            className={cn("h-full rounded-full",
-                              p.score >= 70 ? "bg-red-500" : p.score >= 40 ? "bg-yellow-500" : "bg-blue-500"
-                            )}
-                            style={{ width: `${p.score}%` }}
-                          />
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 60, height: 6, background: "var(--line)", borderRadius: 6, overflow: "hidden" }}>
+                          <div style={{ height: 6, borderRadius: 6, width: `${p.score}%`, background: p.score >= 70 ? "var(--red)" : p.score >= 40 ? "var(--amber)" : "var(--blue)" }} />
                         </div>
-                        <span className="text-sm text-white">{p.score}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{p.score}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-400">{Math.round(p.timeOnWebinar / 60)} мин</td>
-                    <td className="px-4 py-3 text-sm text-gray-400">{p.country ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        {card?.aiCardAt
-                          ? <span className="text-xs text-violet-400 font-medium">🤖 Есть</span>
-                          : <span className="text-xs text-gray-600">—</span>
-                        }
-                        {isExpanded
-                          ? <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
-                          : <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-                        }
+                    <td style={{ padding: "12px 16px", fontSize: 13, color: "var(--muted)" }}>{Math.round(p.timeOnWebinar / 60)} мин</td>
+                    <td style={{ padding: "12px 16px", fontSize: 13, color: "var(--muted)" }}>{p.country ?? "—"}</td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {lcard?.aiCardAt ? <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>🤖 Есть</span> : <span style={{ fontSize: 12, color: "var(--muted)" }}>—</span>}
+                        {isExpanded ? <ChevronUp size={13} color="var(--muted)" /> : <ChevronDown size={13} color="var(--muted)" />}
                       </div>
                     </td>
                   </tr>
@@ -396,82 +308,48 @@ export default function WebinarDetailPage() {
 
                 const cardRow = (
                   <tr key={`${p.id}-card`}>
-                    <td colSpan={6} className="p-0">
-                      <div className="bg-gray-950 border-t border-gray-800">
-                        {/* Сообщения в чате */}
-                        {card && card.chatMessages.length > 0 && (
-                          <div className="px-5 py-4 border-b border-gray-800">
-                            <p className="text-xs font-semibold text-gray-400 mb-2.5">
-                              💬 Писал в чате ({card.chatMessages.length})
-                            </p>
-                            <div className="flex flex-col gap-1.5">
-                              {card.chatMessages.map((msg, i) => (
-                                <div key={i} className="flex items-start gap-2 bg-gray-900 rounded-lg px-3 py-2">
-                                  <span className="text-xs text-gray-600 mt-0.5 shrink-0">{i + 1}.</span>
-                                  <p className="text-sm text-gray-200 leading-relaxed">{msg}</p>
+                    <td colSpan={6} style={{ padding: 0 }}>
+                      <div style={{ background: "var(--soft)", borderTop: "1px solid var(--border)" }}>
+                        {lcard && lcard.chatMessages.length > 0 && (
+                          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--line)" }}>
+                            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", margin: "0 0 10px" }}>💬 Писал в чате ({lcard.chatMessages.length})</p>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              {lcard.chatMessages.map((msg, i) => (
+                                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "var(--card)", borderRadius: 8, padding: "8px 12px" }}>
+                                  <span style={{ fontSize: 11, color: "var(--muted)", flexShrink: 0, marginTop: 2 }}>{i + 1}.</span>
+                                  <p style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.5, margin: 0 }}>{msg}</p>
                                 </div>
                               ))}
                             </div>
                           </div>
                         )}
-
-                        {/* AI карточка */}
-                        {!card || !card.aiCardAt ? (
-                          <div className="px-5 py-4">
-                            <p className="text-xs text-gray-500">
-                              {!card ? "AI-карточка не сгенерирована для этого участника." : "Участник вне топ-30 по баллу — карточка не создавалась."}
-                            </p>
+                        {!lcard || !lcard.aiCardAt ? (
+                          <div style={{ padding: "16px 20px" }}>
+                            <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>{!lcard ? "AI-карточка не сгенерирована для этого участника." : "Участник вне топ-30 по баллу — карточка не создавалась."}</p>
                           </div>
                         ) : (
-                          <div className="px-5 py-4 grid grid-cols-2 gap-4">
-                            {card.painPoints.length > 0 && (
-                              <div>
-                                <p className="text-xs font-semibold text-gray-400 mb-2">🎯 Боли</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {card.painPoints.map((pt, i) => (
-                                    <span key={i} className="text-xs bg-orange-500/10 text-orange-300 border border-orange-500/20 px-2 py-0.5 rounded-full">{pt}</span>
-                                  ))}
-                                </div>
-                              </div>
+                          <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                            {lcard.painPoints.length > 0 && (
+                              <div><p style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", margin: "0 0 8px" }}>🎯 Боли</p><div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{lcard.painPoints.map((pt, i) => <span key={i} style={{ fontSize: 12, background: "var(--amberbg)", color: "var(--amber)", padding: "2px 8px", borderRadius: 20 }}>{pt}</span>)}</div></div>
                             )}
-                            {card.objections.length > 0 && (
-                              <div>
-                                <p className="text-xs font-semibold text-gray-400 mb-2">⚠️ Возражения</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {card.objections.map((obj, i) => (
-                                    <span key={i} className="text-xs bg-red-500/10 text-red-300 border border-red-500/20 px-2 py-0.5 rounded-full">{obj}</span>
-                                  ))}
-                                </div>
-                              </div>
+                            {lcard.objections.length > 0 && (
+                              <div><p style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", margin: "0 0 8px" }}>⚠️ Возражения</p><div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{lcard.objections.map((obj, i) => <span key={i} style={{ fontSize: 12, background: "var(--redbg)", color: "var(--red)", padding: "2px 8px", borderRadius: 20 }}>{obj}</span>)}</div></div>
                             )}
-                            {card.openingPhrase && (
-                              <div className="col-span-2">
-                                <p className="text-xs font-semibold text-gray-400 mb-2">📞 Первая фраза</p>
-                                <div className="flex items-start gap-2 bg-violet-500/10 border border-violet-500/20 rounded-lg px-3 py-2.5">
-                                  <p className="text-sm text-violet-200 flex-1 leading-relaxed">{card.openingPhrase}</p>
-                                  <button
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      await navigator.clipboard.writeText(card.openingPhrase!);
-                                      setCopiedPhrase(p.id);
-                                      setTimeout(() => setCopiedPhrase(null), 2000);
-                                    }}
-                                    className="flex-shrink-0 p-1 rounded text-gray-500 hover:text-violet-400 transition-colors"
-                                  >
-                                    {copiedPhrase === p.id
-                                      ? <Check className="w-3.5 h-3.5 text-green-400" />
-                                      : <Copy className="w-3.5 h-3.5" />
-                                    }
+                            {lcard.openingPhrase && (
+                              <div style={{ gridColumn: "1 / -1" }}>
+                                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", margin: "0 0 8px" }}>📞 Первая фраза</p>
+                                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "color-mix(in srgb, var(--accent) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 20%, transparent)", borderRadius: 10, padding: "10px 12px" }}>
+                                  <p style={{ fontSize: 13.5, color: "var(--text)", flex: 1, lineHeight: 1.5, margin: 0 }}>{lcard.openingPhrase}</p>
+                                  <button onClick={async (e) => { e.stopPropagation(); await navigator.clipboard.writeText(lcard.openingPhrase!); setCopiedPhrase(p.id); setTimeout(() => setCopiedPhrase(null), 2000); }} style={{ flexShrink: 0, padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "var(--muted)" }}>
+                                    {copiedPhrase === p.id ? <Check size={13} color="var(--green)" /> : <Copy size={13} />}
                                   </button>
                                 </div>
                               </div>
                             )}
-                            {card.recommendedProduct && (
-                              <div className="col-span-2">
-                                <p className="text-xs font-semibold text-gray-400 mb-2">🛍️ Рекомендовать</p>
-                                <span className="text-xs bg-green-500/10 text-green-300 border border-green-500/20 px-3 py-1.5 rounded-lg inline-block">
-                                  {card.recommendedProduct}
-                                </span>
+                            {lcard.recommendedProduct && (
+                              <div style={{ gridColumn: "1 / -1" }}>
+                                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", margin: "0 0 8px" }}>🛍️ Рекомендовать</p>
+                                <span style={{ fontSize: 12, background: "var(--greenbg)", color: "var(--green)", padding: "5px 12px", borderRadius: 8 }}>{lcard.recommendedProduct}</span>
                               </div>
                             )}
                           </div>

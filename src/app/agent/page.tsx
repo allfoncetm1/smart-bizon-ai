@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, Bot, MessageSquare, Users, Bell, Table2 } from "lucide-react";
 
 interface AgentConfig {
   id: string;
@@ -27,70 +26,41 @@ interface AgentConfig {
   googleSheetId: string | null;
 }
 
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
       onClick={() => onChange(!checked)}
-      className={`relative w-10 h-5 rounded-full transition-colors ${
-        checked ? "bg-violet-600" : "bg-gray-700"
-      }`}
+      style={{ position: "relative", width: 46, height: 26, borderRadius: 20, background: checked ? "var(--green)" : "var(--line)", border: "none", cursor: "pointer", flexShrink: 0, transition: "background 0.2s" }}
     >
-      <span
-        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0"
-        }`}
-      />
+      <span style={{ position: "absolute", top: 3, left: checked ? 23 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.25)", transition: "left 0.2s" }} />
     </button>
   );
 }
 
-function Section({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
+function Card({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-      <div className="flex items-center gap-2 mb-5">
-        <div className="text-violet-400">{icon}</div>
-        <h2 className="font-semibold text-white">{title}</h2>
-      </div>
-      <div className="space-y-4">{children}</div>
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, boxShadow: "0 1px 2px rgba(20,20,50,.04)" }}>
+      {title && <h3 style={{ margin: "0 0 16px", fontSize: 15.5, fontWeight: 700, color: "var(--text)" }}>{title}</h3>}
+      {children}
     </div>
   );
 }
 
-function ToggleRow({
-  label,
-  description,
-  checked,
-  onChange,
-}: {
-  label: string;
-  description?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
+function ToggleRow({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between">
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
       <div>
-        <p className="text-sm text-white">{label}</p>
-        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        <p style={{ margin: 0, fontSize: 13.5, fontWeight: 500, color: "var(--text)" }}>{label}</p>
+        {description && <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--muted)" }}>{description}</p>}
       </div>
       <Toggle checked={checked} onChange={onChange} />
     </div>
   );
 }
+
+const inputStyle: React.CSSProperties = { width: "100%", border: "1px solid var(--border)", borderRadius: 10, padding: "11px 13px", fontFamily: "inherit", fontSize: 14, color: "var(--text)", background: "var(--card)", outline: "none" };
+const textareaStyle: React.CSSProperties = { ...inputStyle, resize: "vertical" as const, minHeight: 74 };
+const labelStyle: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, marginBottom: 7, color: "var(--text)" };
 
 export default function AgentPage() {
   const [config, setConfig] = useState<AgentConfig | null>(null);
@@ -112,10 +82,7 @@ export default function AgentPage() {
       })
       .then((r) => r?.json())
       .then((c) => {
-        if (c) {
-          setConfig(c);
-          setBanWordsInput((c.customBanWords ?? []).join(", "));
-        }
+        if (c) { setConfig(c); setBanWordsInput((c.customBanWords ?? []).join(", ")); }
       });
   }, []);
 
@@ -127,18 +94,8 @@ export default function AgentPage() {
     if (!config || !projectId) return;
     setSaving(true);
     try {
-      const payload = {
-        ...config,
-        customBanWords: banWordsInput
-          .split(",")
-          .map((w) => w.trim())
-          .filter(Boolean),
-      };
-      await fetch(`/api/agent/config?projectId=${projectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const payload = { ...config, customBanWords: banWordsInput.split(",").map((w) => w.trim()).filter(Boolean) };
+      await fetch(`/api/agent/config?projectId=${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -148,254 +105,145 @@ export default function AgentPage() {
 
   function addFaq() {
     if (!faqQuestion || !faqAnswer) return;
-    const existing = config?.customFaq ?? [];
-    update("customFaq", [...existing, { question: faqQuestion, answer: faqAnswer }]);
-    setFaqQuestion("");
-    setFaqAnswer("");
-  }
-
-  function removeFaq(i: number) {
-    const existing = config?.customFaq ?? [];
-    update("customFaq", existing.filter((_, idx) => idx !== i));
+    update("customFaq", [...(config?.customFaq ?? []), { question: faqQuestion, answer: faqAnswer }]);
+    setFaqQuestion(""); setFaqAnswer("");
   }
 
   if (!config) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-500">Загрузка настроек агента...</p>
-      </div>
-    );
+    return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", color: "var(--muted)", fontSize: 14 }}>Загрузка настроек агента...</div>;
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-center justify-between">
+    <div style={{ maxWidth: 840 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 22 }}>
         <div>
-          <h1 className="text-2xl font-bold text-white">Настройки AI Агента</h1>
-          <p className="text-gray-400 mt-1">Настройте поведение агента под ваш вебинар</p>
+          <h2 style={{ margin: "0 0 3px", fontSize: 21, fontWeight: 700, letterSpacing: "-0.015em", color: "var(--text)" }}>Настройки AI Агента</h2>
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)" }}>Настройте поведение агента под ваш вебинар</p>
         </div>
-        <button
-          onClick={save}
-          disabled={saving}
-          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50"
-        >
-          <Save className="w-4 h-4" />
+        <button onClick={save} disabled={saving} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: "var(--accent)", border: "none", borderRadius: 10, padding: "10px 18px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: "#fff", opacity: saving ? 0.7 : 1 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
           {saved ? "Сохранено ✓" : saving ? "Сохранение..." : "Сохранить"}
         </button>
       </div>
 
-      {/* Общее */}
-      <Section title="Статус агента" icon={<Bot className="w-4 h-4" />}>
-        <ToggleRow
-          label="Агент активен"
-          description="Включить или выключить AI обработку вебинаров"
-          checked={config.isActive}
-          onChange={(v) => update("isActive", v)}
-        />
-      </Section>
+      <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+        {/* Status */}
+        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, boxShadow: "0 1px 2px rgba(20,20,50,.04)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Статус агента · <span style={{ color: config.isActive ? "var(--green)" : "var(--red)" }}>{config.isActive ? "Активен" : "Выключен"}</span></div>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--muted)" }}>Включить или выключить AI обработку вебинаров</p>
+          </div>
+          <Toggle checked={config.isActive} onChange={(v) => update("isActive", v)} />
+        </div>
 
-      {/* Продукт */}
-      <Section title="О вашем продукте" icon={<Bot className="w-4 h-4" />}>
-        <div>
-          <label className="text-sm text-gray-400 mb-1.5 block">Описание продукта</label>
-          <textarea
-            value={config.productDescription ?? ""}
-            onChange={(e) => update("productDescription", e.target.value)}
-            rows={3}
-            placeholder="Опишите ваш продукт или услугу..."
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 resize-none"
-          />
-        </div>
-        <div>
-          <label className="text-sm text-gray-400 mb-1.5 block">Целевая аудитория</label>
-          <textarea
-            value={config.targetAudience ?? ""}
-            onChange={(e) => update("targetAudience", e.target.value)}
-            rows={2}
-            placeholder="Кто ваши клиенты..."
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 resize-none"
-          />
-        </div>
-        <div>
-          <label className="text-sm text-gray-400 mb-1.5 block">Скрипт продаж / ключевые тезисы</label>
-          <textarea
-            value={config.salesScript ?? ""}
-            onChange={(e) => update("salesScript", e.target.value)}
-            rows={3}
-            placeholder="Ключевые преимущества, цена, оффер..."
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 resize-none"
-          />
-        </div>
-      </Section>
+        {/* Product */}
+        <Card title="О вашем продукте">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div><label style={labelStyle}>Описание продукта</label><textarea style={textareaStyle} value={config.productDescription ?? ""} onChange={(e) => update("productDescription", e.target.value)} placeholder="Опишите ваш продукт или услугу…" /></div>
+            <div><label style={labelStyle}>Целевая аудитория</label><textarea style={{ ...textareaStyle, minHeight: 60 }} value={config.targetAudience ?? ""} onChange={(e) => update("targetAudience", e.target.value)} placeholder="Кто ваши клиенты…" /></div>
+            <div><label style={labelStyle}>Скрипт продаж / ключевые тезисы</label><textarea style={textareaStyle} value={config.salesScript ?? ""} onChange={(e) => update("salesScript", e.target.value)} placeholder="Ключевые преимущества, цена, оффер…" /></div>
+          </div>
+        </Card>
 
-      {/* Модерация */}
-      <Section title="Модерация чата" icon={<MessageSquare className="w-4 h-4" />}>
-        <ToggleRow
-          label="Включить модерацию"
-          checked={config.moderationEnabled}
-          onChange={(v) => update("moderationEnabled", v)}
-        />
-        {config.moderationEnabled && (
-          <>
-            <ToggleRow label="Фильтровать спам" checked={config.filterSpam} onChange={(v) => update("filterSpam", v)} />
-            <ToggleRow label="Фильтровать мат и оскорбления" checked={config.filterMat} onChange={(v) => update("filterMat", v)} />
-            <ToggleRow label="Фильтровать токсичные сообщения" checked={config.filterToxic} onChange={(v) => update("filterToxic", v)} />
+        {/* Segmentation */}
+        <Card title="Сегментация лидов">
+          <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            {[
+              { label: "Порог Горячего лида", key: "hotScoreThreshold" as const, color: "var(--red)" },
+              { label: "Порог Тёплого лида", key: "warmScoreThreshold" as const, color: "var(--amber)" },
+            ].map((item) => {
+              const val = config[item.key] as number;
+              return (
+                <div key={item.key}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{item.label}</label>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: item.color }}>{val}</span>
+                  </div>
+                  <div style={{ height: 6, background: "var(--line)", borderRadius: 6, position: "relative" }}>
+                    <div style={{ position: "absolute", left: 0, top: 0, height: 6, width: `${val}%`, background: item.color, borderRadius: 6 }} />
+                    <span style={{ position: "absolute", left: `${val}%`, top: "50%", transform: "translate(-50%,-50%)", width: 18, height: 18, borderRadius: "50%", background: "#fff", border: `2px solid ${item.color}`, boxShadow: "0 1px 3px rgba(0,0,0,.2)", display: "inline-block" }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11.5, color: "var(--muted)" }}>
+                    <span>0</span>
+                    <input type="range" min={0} max={100} value={val} onChange={(e) => update(item.key, parseInt(e.target.value))} style={{ flex: 1, margin: "0 12px", accentColor: item.color }} />
+                    <span>100</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* Moderation */}
+        <Card title="Модерация чата">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <ToggleRow label="Включить модерацию" checked={config.moderationEnabled} onChange={(v) => update("moderationEnabled", v)} />
+            {config.moderationEnabled && (
+              <>
+                <ToggleRow label="Фильтровать спам" checked={config.filterSpam} onChange={(v) => update("filterSpam", v)} />
+                <ToggleRow label="Фильтровать мат и оскорбления" checked={config.filterMat} onChange={(v) => update("filterMat", v)} />
+                <ToggleRow label="Фильтровать токсичные сообщения" checked={config.filterToxic} onChange={(v) => update("filterToxic", v)} />
+                <div>
+                  <label style={labelStyle}>Запрещённые слова (через запятую)</label>
+                  <input style={inputStyle} value={banWordsInput} onChange={(e) => setBanWordsInput(e.target.value)} placeholder="слово1, слово2, слово3" />
+                </div>
+              </>
+            )}
+          </div>
+        </Card>
+
+        {/* Auto answers */}
+        <Card title="Автоматические ответы">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <ToggleRow label="Генерировать ответы на вопросы" description="AI будет анализировать вопросы и готовить ответы" checked={config.autoAnswersEnabled} onChange={(v) => update("autoAnswersEnabled", v)} />
             <div>
-              <label className="text-sm text-gray-400 mb-1.5 block">
-                Запрещённые слова (через запятую)
-              </label>
-              <input
-                value={banWordsInput}
-                onChange={(e) => setBanWordsInput(e.target.value)}
-                placeholder="слово1, слово2, слово3"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
-              />
-            </div>
-          </>
-        )}
-      </Section>
-
-      {/* Авто-ответы */}
-      <Section title="Автоматические ответы" icon={<MessageSquare className="w-4 h-4" />}>
-        <ToggleRow
-          label="Генерировать ответы на вопросы"
-          description="AI будет анализировать вопросы и готовить ответы"
-          checked={config.autoAnswersEnabled}
-          onChange={(v) => update("autoAnswersEnabled", v)}
-        />
-
-        {/* FAQ */}
-        <div>
-          <p className="text-sm text-gray-400 mb-2">База FAQ (вопрос-ответ)</p>
-          {(config.customFaq ?? []).map((item, i) => (
-            <div key={i} className="flex gap-2 mb-2 text-sm">
-              <div className="flex-1 bg-gray-800 rounded-lg px-3 py-2">
-                <p className="text-violet-300">Q: {item.question}</p>
-                <p className="text-gray-300 mt-0.5">A: {item.answer}</p>
+              <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--muted)", fontWeight: 600 }}>База FAQ (вопрос-ответ)</p>
+              {(config.customFaq ?? []).map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <div style={{ flex: 1, background: "var(--soft)", borderRadius: 10, padding: "10px 12px", border: "1px solid var(--border)" }}>
+                    <p style={{ fontSize: 12.5, color: "var(--accent)", margin: "0 0 4px" }}>Q: {item.question}</p>
+                    <p style={{ fontSize: 12.5, color: "var(--text)", margin: 0 }}>A: {item.answer}</p>
+                  </div>
+                  <button onClick={() => update("customFaq", (config.customFaq ?? []).filter((_, idx) => idx !== i))} style={{ color: "var(--muted)", background: "transparent", border: "none", cursor: "pointer", padding: "0 8px", fontSize: 16 }}>✕</button>
+                </div>
+              ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                <input style={inputStyle} value={faqQuestion} onChange={(e) => setFaqQuestion(e.target.value)} placeholder="Вопрос..." />
+                <input style={inputStyle} value={faqAnswer} onChange={(e) => setFaqAnswer(e.target.value)} placeholder="Ответ..." />
+                <button onClick={addFaq} disabled={!faqQuestion || !faqAnswer} style={{ alignSelf: "flex-start", background: "var(--soft)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 16px", fontFamily: "inherit", fontSize: 13, color: "var(--accent)", fontWeight: 600, cursor: "pointer", opacity: (!faqQuestion || !faqAnswer) ? 0.4 : 1 }}>+ Добавить</button>
               </div>
-              <button
-                onClick={() => removeFaq(i)}
-                className="text-gray-500 hover:text-red-400 px-2"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-          <div className="space-y-2 mt-2">
-            <input
-              value={faqQuestion}
-              onChange={(e) => setFaqQuestion(e.target.value)}
-              placeholder="Вопрос..."
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
-            />
-            <input
-              value={faqAnswer}
-              onChange={(e) => setFaqAnswer(e.target.value)}
-              placeholder="Ответ..."
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
-            />
-            <button
-              onClick={addFaq}
-              disabled={!faqQuestion || !faqAnswer}
-              className="text-sm bg-gray-800 hover:bg-gray-700 text-violet-400 px-4 py-2 rounded-lg disabled:opacity-40"
-            >
-              + Добавить
-            </button>
-          </div>
-        </div>
-      </Section>
-
-      {/* Скоринг */}
-      <Section title="Сегментация лидов" icon={<Users className="w-4 h-4" />}>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm text-gray-400 mb-1.5 block">
-              Порог Горячего лида (0-100)
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={config.hotScoreThreshold}
-              onChange={(e) => update("hotScoreThreshold", parseInt(e.target.value))}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">Минимальный балл для 🔥 горячего</p>
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 mb-1.5 block">
-              Порог Тёплого лида (0-100)
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={config.warmScoreThreshold}
-              onChange={(e) => update("warmScoreThreshold", parseInt(e.target.value))}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">Минимальный балл для ⚡ тёплого</p>
-          </div>
-        </div>
-      </Section>
-
-      {/* Telegram */}
-      <Section title="Telegram уведомления" icon={<Bell className="w-4 h-4" />}>
-        <ToggleRow
-          label="Включить Telegram уведомления"
-          checked={config.telegramEnabled}
-          onChange={(v) => update("telegramEnabled", v)}
-        />
-        {config.telegramEnabled && (
-          <>
-            <div>
-              <label className="text-sm text-gray-400 mb-1.5 block">Chat ID</label>
-              <input
-                value={config.telegramChatId ?? ""}
-                onChange={(e) => update("telegramChatId", e.target.value)}
-                placeholder="-100123456789"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
-              />
-            </div>
-            <ToggleRow
-              label="Уведомлять о горячих лидах"
-              checked={config.notifyOnHotLead}
-              onChange={(v) => update("notifyOnHotLead", v)}
-            />
-          </>
-        )}
-      </Section>
-
-      {/* Google Sheets */}
-      <Section title="Google Таблица (база клиентов)" icon={<Table2 className="w-4 h-4" />}>
-        <ToggleRow
-          label="Отправлять HOT и WARM лидов в Google Таблицу"
-          description="После каждого анализа вебинара новые горячие и тёплые лиды добавляются в таблицу"
-          checked={config.googleSheetEnabled}
-          onChange={(v) => update("googleSheetEnabled", v)}
-        />
-        {config.googleSheetEnabled && (
-          <div>
-            <label className="text-sm text-gray-400 mb-1.5 block">ID Google Таблицы</label>
-            <input
-              value={config.googleSheetId ?? ""}
-              onChange={(e) => update("googleSheetId", e.target.value)}
-              placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 font-mono"
-            />
-            <p className="text-xs text-gray-500 mt-1.5">
-              Из URL таблицы: docs.google.com/spreadsheets/d/<span className="text-gray-300">ID</span>/edit
-            </p>
-            <div className="mt-3 bg-gray-800 rounded-lg p-3 space-y-1.5 text-xs text-gray-400">
-              <p className="font-medium text-gray-300">Как настроить:</p>
-              <p>1. Создайте Service Account в Google Cloud Console</p>
-              <p>2. Скачайте JSON-ключ и добавьте в Render как env переменную <span className="font-mono text-gray-300">GOOGLE_SERVICE_ACCOUNT_CREDENTIALS</span></p>
-              <p>3. Откройте таблицу и нажмите «Поделиться» → добавьте email из JSON (поле <span className="font-mono text-gray-300">client_email</span>) с правами редактора</p>
-              <p>4. Вставьте ID таблицы выше и сохраните</p>
             </div>
           </div>
-        )}
-      </Section>
+        </Card>
+
+        {/* Telegram */}
+        <Card title="Telegram уведомления">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <ToggleRow label="Включить Telegram уведомления" checked={config.telegramEnabled} onChange={(v) => update("telegramEnabled", v)} />
+            {config.telegramEnabled && (
+              <>
+                <div><label style={labelStyle}>Chat ID</label><input style={inputStyle} value={config.telegramChatId ?? ""} onChange={(e) => update("telegramChatId", e.target.value)} placeholder="-100123456789" /></div>
+                <ToggleRow label="Уведомлять о горячих лидах" checked={config.notifyOnHotLead} onChange={(v) => update("notifyOnHotLead", v)} />
+              </>
+            )}
+          </div>
+        </Card>
+
+        {/* Google Sheets */}
+        <Card title="Google Таблица">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--muted)", lineHeight: 1.5, flex: 1, marginRight: 16 }}>После каждого анализа вебинара новые горячие и тёплые лиды добавляются в таблицу.</p>
+            <Toggle checked={config.googleSheetEnabled} onChange={(v) => update("googleSheetEnabled", v)} />
+          </div>
+          {config.googleSheetEnabled && (
+            <>
+              <label style={labelStyle}>ID Google Таблицы</label>
+              <input style={{ ...inputStyle, fontSize: 13, fontFeatureSettings: "'tnum' 1" }} value={config.googleSheetId ?? ""} onChange={(e) => update("googleSheetId", e.target.value)} placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
+              <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--muted)" }}>Из URL таблицы: docs.google.com/spreadsheets/d/<b>ID</b>/edit</p>
+            </>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

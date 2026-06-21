@@ -1,32 +1,35 @@
-import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 
 interface StatsCardProps {
   title: string;
   value: string | number;
   icon: ReactNode;
-  color: "blue" | "red" | "green" | "violet";
-  subtitle?: string;
+  iconBg: string;
+  iconColor: string;
+  trend?: { value: string; label: string; positive: boolean };
 }
 
-const colorMap = {
-  blue: "bg-blue-500/10 text-blue-400",
-  red: "bg-red-500/10 text-red-400",
-  green: "bg-green-500/10 text-green-400",
-  violet: "bg-violet-500/10 text-violet-400",
-};
-
-export function StatsCard({ title, value, icon, color, subtitle }: StatsCardProps) {
+export function StatsCard({ title, value, icon, iconBg, iconColor, trend }: StatsCardProps) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm text-gray-400">{title}</p>
-        <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center", colorMap[color])}>
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, padding: 22, boxShadow: "0 1px 2px rgba(20,20,50,.04)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--muted)" }}>{title}</span>
+        <span style={{ width: 34, height: 34, borderRadius: 10, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", color: iconColor, flexShrink: 0 }}>
           {icon}
-        </div>
+        </span>
       </div>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+      <div style={{ fontSize: 31, fontWeight: 700, letterSpacing: "-0.02em", marginTop: 14, lineHeight: 1, color: "var(--text)" }}>{value}</div>
+      {trend && (
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 11 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 700, color: trend.positive ? "var(--green)" : "var(--red)", background: trend.positive ? "var(--greenbg)" : "var(--redbg)", padding: "2px 7px", borderRadius: 20 }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              {trend.positive ? <path d="M5 15l7-7 7 7" /> : <path d="M5 9l7 7 7-7" />}
+            </svg>
+            {trend.value}
+          </span>
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>{trend.label}</span>
+        </div>
+      )}
     </div>
   );
 }

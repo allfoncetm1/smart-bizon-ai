@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { RefreshCw, Play, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 
 interface BizonWebinar {
   webinarId: string;
@@ -57,15 +55,10 @@ export default function WebinarsPage() {
       const data = await res.json();
       if (res.ok) {
         setSyncStatus((prev) => ({ ...prev, [webinarId]: "done" }));
-        if (data.webinarId) {
-          setSyncedDbId((prev) => ({ ...prev, [webinarId]: data.webinarId }));
-        }
+        if (data.webinarId) setSyncedDbId((prev) => ({ ...prev, [webinarId]: data.webinarId }));
       } else {
         setSyncStatus((prev) => ({ ...prev, [webinarId]: "error" }));
-        setSyncErrors((prev) => ({
-          ...prev,
-          [webinarId]: data.detail ?? data.error ?? `HTTP ${res.status}`,
-        }));
+        setSyncErrors((prev) => ({ ...prev, [webinarId]: data.detail ?? data.error ?? `HTTP ${res.status}` }));
       }
     } catch (e) {
       setSyncStatus((prev) => ({ ...prev, [webinarId]: "error" }));
@@ -75,110 +68,93 @@ export default function WebinarsPage() {
     }
   }
 
+  const autoStyle = { display: "inline-flex", alignItems: "center", fontSize: 12, fontWeight: 600, color: "var(--blue)", background: "var(--bluebg)", padding: "3px 11px", borderRadius: 20 };
+  const liveStyle = { display: "inline-flex", alignItems: "center", fontSize: 12, fontWeight: 600, color: "var(--red)", background: "var(--redbg)", padding: "3px 11px", borderRadius: 20 };
+  const analyzeStyle = { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "var(--accent)", background: "color-mix(in srgb, var(--accent) 10%, transparent)", padding: "6px 13px", borderRadius: 8, cursor: "pointer", border: "none", fontFamily: "inherit" };
+  const procStyle = { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "var(--muted)", background: "var(--soft)", padding: "6px 13px", borderRadius: 8, border: "none", fontFamily: "inherit" };
+  const doneStyle = { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "var(--green)", background: "var(--greenbg)", padding: "6px 13px", borderRadius: 8, border: "none", fontFamily: "inherit" };
+  const errStyle = { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "var(--red)", background: "var(--redbg)", padding: "6px 13px", borderRadius: 8, cursor: "pointer", border: "none", fontFamily: "inherit" };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 22 }}>
         <div>
-          <h1 className="text-2xl font-bold text-white">Вебинары</h1>
-          <p className="text-gray-400 mt-1">Список вебинаров из Bizon365</p>
+          <h2 style={{ margin: "0 0 3px", fontSize: 21, fontWeight: 700, letterSpacing: "-0.015em", color: "var(--text)" }}>Вебинары</h2>
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)" }}>Список вебинаров из Bizon365 · {webinars.length} записей</p>
         </div>
         <button
           onClick={() => projectId && loadWebinars(projectId)}
           disabled={loading}
-          className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 14px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: "var(--text)", opacity: loading ? 0.6 : 1 }}
         >
-          <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: loading ? "sbSpin 1s linear infinite" : "none" }}><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 3v5h-5" /></svg>
           Обновить список
         </button>
       </div>
 
       {webinars.length === 0 ? (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
-          <p className="text-gray-500">
+        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
+          <p style={{ color: "var(--muted)", fontSize: 14 }}>
             {loading ? "Загрузка..." : "Подключите проект в Настройках для загрузки вебинаров"}
           </p>
         </div>
       ) : (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Название</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Тип</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Дата</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Зрителей</th>
-                <th className="text-right text-xs text-gray-400 font-medium px-5 py-3">Действие</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {webinars.map((w) => {
-                const st = syncStatus[w.webinarId] ?? "idle";
-                const dbId = syncedDbId[w.webinarId];
-                return (
-                  <tr key={w.webinarId} className="hover:bg-gray-800/50 transition-colors">
-                    <td className="px-5 py-3">
-                      <p className="text-sm text-white">{w.name}</p>
-                      <p className="text-xs text-gray-500">{w.webinarId}</p>
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded">
-                        {w.type === "LiveWebinars" ? "Живой" : "Авто"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-sm text-gray-400">
-                      {new Date(w.created).toLocaleDateString("ru-RU")}
-                    </td>
-                    <td className="px-5 py-3 text-sm text-gray-300">{w.viewers}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex flex-col items-end gap-1.5">
-                        <div className="flex items-center gap-2">
-                          {st === "done" && dbId && (
-                            <Link
-                              href={`/webinars/${dbId}`}
-                              className="text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2"
-                            >
-                              Посмотреть →
-                            </Link>
-                          )}
-                          <button
-                            onClick={() => syncWebinar(w.webinarId)}
-                            disabled={syncingId === w.webinarId}
-                            className={cn(
-                              "flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg font-medium transition-colors",
-                              st === "done"
-                                ? "bg-green-500/10 text-green-400"
-                                : st === "error"
-                                ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                                : "bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50"
-                            )}
-                          >
-                            {st === "loading" ? (
-                              <RefreshCw className="w-4 h-4 animate-spin text-yellow-400" />
-                            ) : st === "done" ? (
-                              <CheckCircle className="w-4 h-4" />
-                            ) : st === "error" ? (
-                              <AlertCircle className="w-4 h-4" />
-                            ) : (
-                              <Play className="w-4 h-4" />
-                            )}
-                            {st === "idle" && "Анализировать"}
-                            {st === "loading" && "Обработка..."}
-                            {st === "done" && "Готово"}
-                            {st === "error" && "Ошибка — повторить"}
-                          </button>
-                        </div>
-                        {st === "error" && syncErrors[w.webinarId] && (
-                          <p className="text-xs text-red-400/80 max-w-xs text-right break-all">
-                            {syncErrors[w.webinarId]}
-                          </p>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "0 1px 2px rgba(20,20,50,.04)", overflow: "hidden" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 130px 110px 150px", padding: "15px 22px", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" as const, color: "#a3a2b0", borderBottom: "1px solid var(--border)" }}>
+            <span>Название</span><span>Тип</span><span>Дата</span><span style={{ textAlign: "right" }}>Зрителей</span><span style={{ textAlign: "right" }}>Действие</span>
+          </div>
+          {webinars.map((w) => {
+            const st = syncStatus[w.webinarId] ?? "idle";
+            const dbId = syncedDbId[w.webinarId];
+            return (
+              <div key={w.webinarId} style={{ display: "grid", gridTemplateColumns: "1fr 110px 130px 110px 150px", alignItems: "center", padding: "13px 22px", borderBottom: "1px solid var(--line)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 9, background: "color-mix(in srgb, var(--accent) 11%, transparent)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--text)" }}>{w.name}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>{w.webinarId}</div>
+                  </div>
+                </div>
+                <div>
+                  <span style={w.type === "LiveWebinars" ? liveStyle : autoStyle}>
+                    {w.type === "LiveWebinars" ? "Живой" : "Авто"}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text)" }}>{new Date(w.created).toLocaleDateString("ru-RU")}</div>
+                <div style={{ textAlign: "right", fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{w.viewers}</div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {st === "done" && dbId && (
+                        <Link href={`/webinars/${dbId}`} style={{ fontSize: 12, color: "var(--accent)", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                          Посмотреть →
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => syncWebinar(w.webinarId)}
+                        disabled={syncingId === w.webinarId}
+                        style={st === "done" ? doneStyle : st === "error" ? errStyle : st === "loading" ? procStyle : analyzeStyle}
+                      >
+                        {st === "loading" && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "sbSpin 1s linear infinite" }}><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 3v5h-5" /></svg>}
+                        {st === "idle" && "Анализировать"}
+                        {st === "loading" && "Обработка..."}
+                        {st === "done" && "✓ Готово"}
+                        {st === "error" && "Ошибка — повторить"}
+                      </button>
+                    </div>
+                    {st === "error" && syncErrors[w.webinarId] && (
+                      <p style={{ fontSize: 11, color: "var(--red)", maxWidth: 200, textAlign: "right", wordBreak: "break-all" as const }}>{syncErrors[w.webinarId]}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px" }}>
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>Показано {webinars.length} записей</span>
+          </div>
         </div>
       )}
     </div>
