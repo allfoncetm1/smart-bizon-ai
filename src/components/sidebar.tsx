@@ -80,8 +80,8 @@ export function Sidebar() {
     <aside style={{ width: 262, flexShrink: 0, background: "var(--card)", borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", padding: "20px 16px", position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 40 }}>
       {/* Logo */}
       <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "6px 8px 4px" }}>
-        <div style={{ width: 38, height: 38, borderRadius: 11, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px color-mix(in srgb,var(--accent) 35%,transparent)", flexShrink: 0 }}>
-          <span style={{ color: "#fff", fontWeight: 800, fontSize: 15, letterSpacing: "-0.02em" }}>SB</span>
+        <div style={{ width: 38, height: 38, borderRadius: 11, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px color-mix(in srgb,var(--accent) 35%,transparent)", flexShrink: 0, overflow: "hidden" }}>
+          <img src="/logo.png" alt="Smart Bizon" style={{ width: 28, height: 28, objectFit: "contain" }} />
         </div>
         <div style={{ minWidth: 0, lineHeight: 1.15 }}>
           <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em", color: "var(--text)" }}>Smart Bizon AI</div>

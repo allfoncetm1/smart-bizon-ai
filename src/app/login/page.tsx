@@ -26,7 +26,9 @@ function LoginContent() {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
       <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 20, padding: 40, display: "flex", flexDirection: "column", alignItems: "center", gap: 24, maxWidth: 360, width: "100%", boxShadow: "0 4px 24px rgba(109,92,255,.08)" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 56, height: 56, background: "linear-gradient(135deg,#8b7bff,#6d5cff)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 800, color: "#fff" }}>SB</div>
+          <div style={{ width: 56, height: 56, background: "var(--accent)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            <img src="/logo.png" alt="Smart Bizon" style={{ width: 42, height: 42, objectFit: "contain" }} />
+          </div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", margin: 0 }}>Smart Bizon AI</h1>
           <p style={{ fontSize: 13.5, color: "var(--muted)", textAlign: "center", margin: 0, lineHeight: 1.5 }}>Войдите через Telegram для доступа к платформе</p>
         </div>

@@ -67,7 +67,9 @@ export function TopBar() {
 
         {/* User */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#8b7bff,#6d5cff)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>SB</div>
+          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            <img src="/logo.png" alt="SB" style={{ width: 26, height: 26, objectFit: "contain" }} />
+          </div>
           <div style={{ lineHeight: 1.2 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Smart Bizon</div>
             <div style={{ fontSize: 11.5, color: "var(--muted)" }}>Администратор</div>
