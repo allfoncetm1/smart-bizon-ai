@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createBizon365Client } from "@/lib/bizon365";
 import { moderateChatMessages, generateWebinarSummary, generateAutoAnswer, generateLeadCards } from "@/lib/ai-agent";
 import { notifyHotLead, notifyWebinarDone } from "@/lib/telegram";
+import { appendLeadsToSheet } from "@/lib/google-sheets";
 import type { BizonChatMessage, BizonViewer } from "@/lib/bizon365";
 
 export async function POST(req: NextRequest) {
@@ -374,6 +375,30 @@ export async function POST(req: NextRequest) {
           });
         }
       }
+    }
+
+    // Google Sheets — отправляем HOT и WARM лидов в таблицу (не блокируем sync)
+    if (config?.googleSheetEnabled && config?.googleSheetId) {
+      const sheetLeads = viewers
+        .map((v, i) => {
+          const score = leadScores[i];
+          if (!score || score.segment === "COLD") return null;
+          const identifier = v.phone ?? v.chatUserId ?? v.username ?? "";
+          const aiCard = aiCardMap[identifier];
+          return {
+            name: v.username,
+            phone: v.phone,
+            mainProblem: aiCard?.painPoints?.[0] ?? "",
+            segment: score.segment,
+            score: score.score,
+            webinarTitle: detail.roomTitle,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+
+      appendLeadsToSheet(config.googleSheetId, sheetLeads).catch((e) => {
+        console.error("Google Sheets sync error:", e?.message ?? e);
+      });
     }
 
     return NextResponse.json({

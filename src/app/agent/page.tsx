@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, Bot, MessageSquare, Users, Bell } from "lucide-react";
+import { Save, Bot, MessageSquare, Users, Bell, Table2 } from "lucide-react";
 
 interface AgentConfig {
   id: string;
@@ -23,6 +23,8 @@ interface AgentConfig {
   targetAudience: string | null;
   salesScript: string | null;
   customFaq: { question: string; answer: string }[] | null;
+  googleSheetEnabled: boolean;
+  googleSheetId: string | null;
 }
 
 function Toggle({
@@ -361,6 +363,37 @@ export default function AgentPage() {
               onChange={(v) => update("notifyOnHotLead", v)}
             />
           </>
+        )}
+      </Section>
+
+      {/* Google Sheets */}
+      <Section title="Google Таблица (база клиентов)" icon={<Table2 className="w-4 h-4" />}>
+        <ToggleRow
+          label="Отправлять HOT и WARM лидов в Google Таблицу"
+          description="После каждого анализа вебинара новые горячие и тёплые лиды добавляются в таблицу"
+          checked={config.googleSheetEnabled}
+          onChange={(v) => update("googleSheetEnabled", v)}
+        />
+        {config.googleSheetEnabled && (
+          <div>
+            <label className="text-sm text-gray-400 mb-1.5 block">ID Google Таблицы</label>
+            <input
+              value={config.googleSheetId ?? ""}
+              onChange={(e) => update("googleSheetId", e.target.value)}
+              placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 font-mono"
+            />
+            <p className="text-xs text-gray-500 mt-1.5">
+              Из URL таблицы: docs.google.com/spreadsheets/d/<span className="text-gray-300">ID</span>/edit
+            </p>
+            <div className="mt-3 bg-gray-800 rounded-lg p-3 space-y-1.5 text-xs text-gray-400">
+              <p className="font-medium text-gray-300">Как настроить:</p>
+              <p>1. Создайте Service Account в Google Cloud Console</p>
+              <p>2. Скачайте JSON-ключ и добавьте в Render как env переменную <span className="font-mono text-gray-300">GOOGLE_SERVICE_ACCOUNT_CREDENTIALS</span></p>
+              <p>3. Откройте таблицу и нажмите «Поделиться» → добавьте email из JSON (поле <span className="font-mono text-gray-300">client_email</span>) с правами редактора</p>
+              <p>4. Вставьте ID таблицы выше и сохраните</p>
+            </div>
+          </div>
         )}
       </Section>
     </div>

@@ -180,6 +180,8 @@ model AgentConfig {
   productDescription String?
   targetAudience     String?
   salesScript        String?
+  googleSheetEnabled Boolean  @default(false)
+  googleSheetId      String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
