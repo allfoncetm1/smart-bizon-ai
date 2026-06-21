@@ -1,25 +1,29 @@
 const TELEGRAM_API = "https://api.telegram.org";
 
 async function sendMessage(botToken: string, chatId: string, text: string) {
-  const url = `${TELEGRAM_API}/bot${botToken}/sendMessage`;
-  const res = await fetch(url, {
+  const res = await fetch(`${TELEGRAM_API}/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "HTML",
-    }),
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
   });
   if (!res.ok) {
-    const err = await res.text();
-    console.error("Telegram error:", err);
+    console.error("Telegram error for chatId", chatId, await res.text());
   }
+}
+
+function parseChatIds(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return raw.split(/[,\n]+/).map((s) => s.trim()).filter(Boolean);
+}
+
+async function broadcast(botToken: string, chatIdRaw: string | null | undefined, text: string) {
+  const ids = parseChatIds(chatIdRaw);
+  await Promise.all(ids.map((id) => sendMessage(botToken, id, text)));
 }
 
 export async function notifyHotLead(params: {
   botToken: string;
-  chatId: string;
+  chatId: string | null | undefined;
   webinarTitle: string;
   name?: string;
   phone?: string;
@@ -37,13 +41,12 @@ export async function notifyHotLead(params: {
     `✅ Рекомендация: ${params.action}`,
   ].join("\n");
 
-  await sendMessage(params.botToken, params.chatId, text);
+  await broadcast(params.botToken, params.chatId, text);
 }
-
 
 export async function notifyWebinarDone(params: {
   botToken: string;
-  chatId: string;
+  chatId: string | null | undefined;
   webinarTitle: string;
   viewers: number;
   hotLeads: number;
@@ -70,5 +73,5 @@ export async function notifyWebinarDone(params: {
     .filter(Boolean)
     .join("\n");
 
-  await sendMessage(params.botToken, params.chatId, text);
+  await broadcast(params.botToken, params.chatId, text);
 }

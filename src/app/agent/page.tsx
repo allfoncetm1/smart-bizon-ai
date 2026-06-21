@@ -70,6 +70,7 @@ export default function AgentPage() {
   const [banWordsInput, setBanWordsInput] = useState("");
   const [faqQuestion, setFaqQuestion] = useState("");
   const [faqAnswer, setFaqAnswer] = useState("");
+  const [chatIds, setChatIds] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/api/projects")
@@ -82,7 +83,11 @@ export default function AgentPage() {
       })
       .then((r) => r?.json())
       .then((c) => {
-        if (c) { setConfig(c); setBanWordsInput((c.customBanWords ?? []).join(", ")); }
+        if (c) {
+          setConfig(c);
+          setBanWordsInput((c.customBanWords ?? []).join(", "));
+          setChatIds(c.telegramChatId ? c.telegramChatId.split(",").map((s: string) => s.trim()).filter(Boolean) : [""]);
+        }
       });
   }, []);
 
@@ -94,7 +99,12 @@ export default function AgentPage() {
     if (!config || !projectId) return;
     setSaving(true);
     try {
-      const payload = { ...config, customBanWords: banWordsInput.split(",").map((w) => w.trim()).filter(Boolean) };
+      const validChatIds = chatIds.map((s) => s.trim()).filter(Boolean);
+      const payload = {
+        ...config,
+        customBanWords: banWordsInput.split(",").map((w) => w.trim()).filter(Boolean),
+        telegramChatId: validChatIds.join(","),
+      };
       await fetch(`/api/agent/config?projectId=${projectId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -221,7 +231,32 @@ export default function AgentPage() {
             <ToggleRow label="Включить Telegram уведомления" checked={config.telegramEnabled} onChange={(v) => update("telegramEnabled", v)} />
             {config.telegramEnabled && (
               <>
-                <div><label style={labelStyle}>Chat ID</label><input style={inputStyle} value={config.telegramChatId ?? ""} onChange={(e) => update("telegramChatId", e.target.value)} placeholder="-100123456789" /></div>
+                <div>
+                  <label style={labelStyle}>Chat ID получателей</label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {chatIds.map((id, i) => (
+                      <div key={i} style={{ display: "flex", gap: 8 }}>
+                        <input
+                          style={{ ...inputStyle, flex: 1 }}
+                          value={id}
+                          onChange={(e) => setChatIds((prev) => prev.map((v, j) => j === i ? e.target.value : v))}
+                          placeholder="-100123456789"
+                        />
+                        {chatIds.length > 1 && (
+                          <button
+                            onClick={() => setChatIds((prev) => prev.filter((_, j) => j !== i))}
+                            style={{ padding: "0 14px", background: "var(--redbg)", border: "1px solid color-mix(in srgb, var(--red) 25%, transparent)", borderRadius: 10, color: "var(--red)", cursor: "pointer", fontSize: 18, fontWeight: 400, flexShrink: 0 }}
+                          >×</button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setChatIds((prev) => [...prev, ""])}
+                      style={{ alignSelf: "flex-start", background: "var(--soft)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 14px", fontFamily: "inherit", fontSize: 13, color: "var(--accent)", fontWeight: 600, cursor: "pointer" }}
+                    >+ Добавить Chat ID</button>
+                  </div>
+                  <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--muted)" }}>Узнать свой Chat ID можно через @userinfobot в Telegram</p>
+                </div>
                 <ToggleRow label="Уведомлять о горячих лидах" checked={config.notifyOnHotLead} onChange={(v) => update("notifyOnHotLead", v)} />
               </>
             )}
