@@ -159,14 +159,13 @@ export default function AgentPage() {
                     <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{item.label}</label>
                     <span style={{ fontSize: 14, fontWeight: 700, color: item.color }}>{val}</span>
                   </div>
-                  <div style={{ height: 6, background: "var(--line)", borderRadius: 6, position: "relative" }}>
-                    <div style={{ position: "absolute", left: 0, top: 0, height: 6, width: `${val}%`, background: item.color, borderRadius: 6 }} />
-                    <span style={{ position: "absolute", left: `${val}%`, top: "50%", transform: "translate(-50%,-50%)", width: 18, height: 18, borderRadius: "50%", background: "#fff", border: `2px solid ${item.color}`, boxShadow: "0 1px 3px rgba(0,0,0,.2)", display: "inline-block" }} />
+                  <div style={{ position: "relative", height: 6, background: "var(--line)", borderRadius: 6, margin: "8px 0" }}>
+                    <div style={{ position: "absolute", left: 0, top: 0, height: 6, width: `${val}%`, background: item.color, borderRadius: 6, pointerEvents: "none" }} />
+                    <span style={{ position: "absolute", left: `${val}%`, top: "50%", transform: "translate(-50%,-50%)", width: 18, height: 18, borderRadius: "50%", background: "#fff", border: `2px solid ${item.color}`, boxShadow: "0 1px 3px rgba(0,0,0,.2)", display: "inline-block", pointerEvents: "none" }} />
+                    <input type="range" min={0} max={100} value={val} onChange={(e) => update(item.key, parseInt(e.target.value))} style={{ position: "absolute", top: "50%", left: 0, transform: "translateY(-50%)", width: "100%", height: 26, opacity: 0, cursor: "pointer", margin: 0, padding: 0 }} />
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11.5, color: "var(--muted)" }}>
-                    <span>0</span>
-                    <input type="range" min={0} max={100} value={val} onChange={(e) => update(item.key, parseInt(e.target.value))} style={{ flex: 1, margin: "0 12px", accentColor: item.color }} />
-                    <span>100</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "var(--muted)" }}>
+                    <span>0</span><span>100</span>
                   </div>
                 </div>
               );

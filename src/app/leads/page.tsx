@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Download, ChevronDown, ChevronUp, Copy, Check, Video } from "lucide-react";
 
 interface SyncedWebinar {
@@ -46,6 +46,42 @@ const segmentLabel: Record<string, string> = {
   WARM: "Тёплый",
   COLD: "Холодный",
 };
+
+function WebinarSelect({ webinars, value, onChange }: { webinars: SyncedWebinar[]; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const selected = webinars.find((w) => w.id === value);
+  const label = selected ? selected.title : "Все вебинары";
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", fontFamily: "inherit", fontSize: 13, color: "var(--text)", cursor: "pointer", minWidth: 200, maxWidth: 320, textAlign: "left" }}>
+        <Video size={14} color="var(--muted)" style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+        <ChevronDown size={13} color="var(--muted)" style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+      </button>
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, minWidth: "100%", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 8px 24px rgba(20,20,50,.1)", zIndex: 50, overflow: "hidden", maxHeight: 280, overflowY: "auto" }}>
+          {[{ id: "", title: "Все вебинары", viewersCount: 0, bizonId: "" }, ...webinars].map((w) => (
+            <button key={w.id || "__all"} onClick={() => { onChange(w.id); setOpen(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 14px", background: value === w.id ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent", border: "none", borderBottom: "1px solid var(--line)", cursor: "pointer", fontFamily: "inherit", fontSize: 13, color: value === w.id ? "var(--accent)" : "var(--text)", textAlign: "left", gap: 8 }}>
+              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.id ? w.title : "Все вебинары"}</span>
+              {w.id && <span style={{ fontSize: 12, color: "var(--muted)", flexShrink: 0, background: "var(--soft)", padding: "2px 8px", borderRadius: 10 }}>{w.viewersCount}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -208,13 +244,7 @@ export default function LeadsPage() {
         </div>
 
         {webinars.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px" }}>
-            <Video size={14} color="var(--muted)" />
-            <select value={selectedWebinarId} onChange={(e) => { setSelectedWebinarId(e.target.value); setExpandedId(null); }} style={{ background: "transparent", fontSize: 13, color: "var(--text)", border: "none", outline: "none", cursor: "pointer", minWidth: 160, maxWidth: 260 }}>
-              <option value="">Все вебинары</option>
-              {webinars.map((w) => <option key={w.id} value={w.id}>{w.title} ({w.viewersCount})</option>)}
-            </select>
-          </div>
+          <WebinarSelect webinars={webinars} value={selectedWebinarId} onChange={(v) => { setSelectedWebinarId(v); setExpandedId(null); }} />
         )}
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", width: 260 }}>
