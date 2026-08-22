@@ -13,6 +13,7 @@ const delayMs = parseInt(process.env.WAIT_DB_DELAY_MS || '1000', 10);
 async function waitForDb() {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      console.log(`Attempt ${attempt}/${maxRetries} — connecting to database...`);
       const client = new Client({
         connectionString,
         ssl: { rejectUnauthorized: false },
@@ -22,8 +23,10 @@ async function waitForDb() {
       console.log('\nDatabase is available');
       process.exit(0);
     } catch (err) {
-      process.stdout.write('.');
-      await new Promise((r) => setTimeout(r, delayMs));
+      console.error(`Attempt ${attempt} failed: ${err.message}`);
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
     }
   }
   console.error('\nTimed out waiting for database');

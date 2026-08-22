@@ -5,38 +5,45 @@ import { SegmentChart } from "@/components/segment-chart";
 import Link from "next/link";
 
 async function getDashboardData() {
-  const project = await prisma.project.findFirst({ orderBy: { createdAt: "desc" } });
-  if (!project) return null;
+  try {
+    const project = await prisma.project.findFirst({ orderBy: { createdAt: "desc" } });
+    if (!project) return null;
 
-  const [totalWebinars, totalLeads, hotLeads, warmLeads, recentWebinars, segmentStats] =
-    await Promise.all([
-      prisma.webinar.count({ where: { projectId: project.id } }),
-      prisma.lead.count({ where: { projectId: project.id } }),
-      prisma.lead.count({ where: { projectId: project.id, segment: "HOT" } }),
-      prisma.lead.count({ where: { projectId: project.id, segment: "WARM" } }),
-      prisma.webinar.findMany({
-        where: { projectId: project.id },
-        include: { analytics: true },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      }),
-      prisma.lead.groupBy({
-        by: ["segment"],
-        where: { projectId: project.id },
-        _count: true,
-      }),
-    ]);
+    const [totalWebinars, totalLeads, hotLeads, warmLeads, recentWebinars, segmentStats] =
+      await Promise.all([
+        prisma.webinar.count({ where: { projectId: project.id } }),
+        prisma.lead.count({ where: { projectId: project.id } }),
+        prisma.lead.count({ where: { projectId: project.id, segment: "HOT" } }),
+        prisma.lead.count({ where: { projectId: project.id, segment: "WARM" } }),
+        prisma.webinar.findMany({
+          where: { projectId: project.id },
+          include: { analytics: true },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        }),
+        prisma.lead.groupBy({
+          by: ["segment"],
+          where: { projectId: project.id },
+          _count: true,
+        }),
+      ]);
 
-  return {
-    project,
-    totalWebinars,
-    totalLeads,
-    hotLeads,
-    warmLeads,
-    conversionRate: totalLeads > 0 ? ((hotLeads / totalLeads) * 100).toFixed(1) : "0",
-    recentWebinars,
-    segmentStats,
-  };
+    return {
+      project,
+      totalWebinars,
+      totalLeads,
+      hotLeads,
+      warmLeads,
+      conversionRate: totalLeads > 0 ? ((hotLeads / totalLeads) * 100).toFixed(1) : "0",
+      recentWebinars,
+      segmentStats,
+    };
+  } catch (err) {
+    // If DB is not available during build (migrations not applied yet), return null so build can continue
+    // eslint-disable-next-line no-console
+    console.warn("Dashboard data unavailable during build/runtime:", err?.message ?? err);
+    return null;
+  }
 }
 
 export default async function DashboardPage() {
