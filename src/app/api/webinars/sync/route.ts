@@ -7,34 +7,52 @@ import { appendLeadsToSheet } from "@/lib/google-sheets";
 import type { BizonChatMessage, BizonViewer } from "@/lib/bizon365";
 
 export async function POST(req: NextRequest) {
-  let webinarDbId: string | null = null;
-  try {
-    const { projectId, webinarId } = await req.json();
+  const { projectId, webinarId } = await req.json();
 
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      include: { agentConfig: true },
-    });
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: { agentConfig: true },
+  });
 
-    if (!project) {
-      return NextResponse.json({ error: "Проект не найден" }, { status: 404 });
-    }
+  if (!project) {
+    return NextResponse.json({ error: "Проект не найден" }, { status: 404 });
+  }
 
+  // Отмечаем как "в обработке" и сразу отвечаем — сама обработка (AI-модерация,
+  // скоринг, карточки лидов) может занимать несколько минут и не укладывается
+  // в таймаут прокси (Cloudflare обрывает соединение на 100-й секунде).
+  // Клиент узнаёт результат поллингом GET /api/webinars/[id] по полю status.
+  const webinar = await prisma.webinar.upsert({
+    where: { bizonId: webinarId },
+    create: {
+      bizonId: webinarId,
+      projectId: project.id,
+      title: "Загрузка...",
+      type: "AUTO",
+      status: "PROCESSING",
+    },
+    update: { status: "PROCESSING" },
+  });
+
+  runSync(project, webinarId).catch(async (error) => {
+    console.error("Sync error:", error);
+    await prisma.webinar.update({
+      where: { id: webinar.id },
+      data: { status: "ERROR" },
+    }).catch(() => {});
+  });
+
+  return NextResponse.json({ success: true, started: true, webinarId: webinar.id });
+}
+
+async function runSync(
+  project: NonNullable<Awaited<ReturnType<typeof prisma.project.findUnique>>> & {
+    agentConfig: Awaited<ReturnType<typeof prisma.agentConfig.findUnique>>;
+  },
+  webinarId: string
+) {
     const bizon = createBizon365Client(project.apiToken, project.bizonId);
     const config = project.agentConfig;
-
-    // Отмечаем как "в обработке"
-    await prisma.webinar.upsert({
-      where: { bizonId: webinarId },
-      create: {
-        bizonId: webinarId,
-        projectId: project.id,
-        title: "Загрузка...",
-        type: "AUTO",
-        status: "PROCESSING",
-      },
-      update: { status: "PROCESSING" },
-    });
 
     // Загружаем данные параллельно
     const [detail, viewers] = await Promise.all([
@@ -59,7 +77,6 @@ export async function POST(req: NextRequest) {
         status: "PROCESSING",
       },
     });
-    webinarDbId = webinar.id;
 
     // AI модерация чата — батчами по 50 чтобы не переполнять промпт
     const messages: BizonChatMessage[] = detail.messages;
@@ -401,28 +418,4 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      webinarId: webinar.id,
-      stats: {
-        viewers: viewers.length,
-        messages: messages.length,
-        spam: spamCount,
-        questions: questionsCount,
-        hotLeads: hotCount,
-        conversionRate,
-        summary: summary.summary,
-      },
-    });
-  } catch (error) {
-    console.error("Sync error:", error);
-    if (webinarDbId) {
-      await prisma.webinar.update({
-        where: { id: webinarDbId },
-        data: { status: "ERROR" },
-      }).catch(() => {});
-    }
-    const errMsg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: "Ошибка синхронизации", detail: errMsg }, { status: 500 });
-  }
 }

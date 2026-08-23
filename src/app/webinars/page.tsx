@@ -42,20 +42,46 @@ export default function WebinarsPage() {
     }
   }
 
+  async function pollWebinarStatus(dbId: string, webinarId: string) {
+    const POLL_INTERVAL = 3000;
+    const MAX_ATTEMPTS = 100; // ~5 минут
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+      const res = await fetch(`/api/webinars/${dbId}`);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.status === "DONE") {
+        setSyncStatus((prev) => ({ ...prev, [webinarId]: "done" }));
+        return;
+      }
+      if (data.status === "ERROR") {
+        setSyncStatus((prev) => ({ ...prev, [webinarId]: "error" }));
+        setSyncErrors((prev) => ({ ...prev, [webinarId]: "Обработка завершилась с ошибкой" }));
+        return;
+      }
+    }
+    setSyncStatus((prev) => ({ ...prev, [webinarId]: "error" }));
+    setSyncErrors((prev) => ({ ...prev, [webinarId]: "Превышено время ожидания обработки" }));
+  }
+
   async function syncWebinar(webinarId: string) {
     setSyncStatus((prev) => ({ ...prev, [webinarId]: "loading" }));
     setSyncErrors((prev) => ({ ...prev, [webinarId]: "" }));
     setSyncingId(webinarId);
     try {
+      // Обработка вебинара (AI-модерация, скоринг, карточки лидов) может идти
+      // несколько минут — сервер отвечает сразу после запуска, а результат
+      // узнаём поллингом статуса, чтобы не упереться в таймаут прокси.
       const res = await fetch("/api/webinars/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, webinarId }),
       });
       const data = await res.json();
-      if (res.ok) {
-        setSyncStatus((prev) => ({ ...prev, [webinarId]: "done" }));
-        if (data.webinarId) setSyncedDbId((prev) => ({ ...prev, [webinarId]: data.webinarId }));
+      if (res.ok && data.webinarId) {
+        setSyncedDbId((prev) => ({ ...prev, [webinarId]: data.webinarId }));
+        await pollWebinarStatus(data.webinarId, webinarId);
       } else {
         setSyncStatus((prev) => ({ ...prev, [webinarId]: "error" }));
         setSyncErrors((prev) => ({ ...prev, [webinarId]: data.detail ?? data.error ?? `HTTP ${res.status}` }));
