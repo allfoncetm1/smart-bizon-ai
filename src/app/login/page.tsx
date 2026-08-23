@@ -27,10 +27,22 @@ function LoginContent() {
     <div className="min-h-screen flex items-center justify-center bg-[#f3f3f7] p-4">
       <div className="w-full max-w-5xl relative overflow-hidden rounded-3xl shadow-2xl flex flex-col md:flex-row">
         {/* Left: brand panel */}
-        <div className="relative md:w-1/2 min-h-[220px] md:min-h-[560px] overflow-hidden bg-[#12101c] flex flex-col justify-between p-10 md:p-12">
-          <div className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-[#6d5cff] opacity-40 blur-3xl" />
-          <div className="pointer-events-none absolute top-1/3 -right-10 h-56 w-56 rounded-full bg-[#8f7bff] opacity-30 blur-3xl" />
-          <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-[#12101c] via-transparent to-transparent" />
+        <div className="relative md:w-1/2 min-h-[220px] md:min-h-[560px] overflow-hidden bg-[#0c0a14] flex flex-col justify-between p-10 md:p-12">
+          {/* glow bleeding up from the bottom */}
+          <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-20 h-80 w-80 rounded-full bg-[#6d5cff] opacity-80 blur-[70px]" />
+
+          {/* frosted vertical glass stripes over the glow */}
+          <div className="pointer-events-none absolute inset-0 flex backdrop-blur-2xl">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-full flex-1 bg-linear-90 from-[#ffffff00] via-[#0c0a14] via-[69%] to-[#ffffff30] opacity-40"
+              />
+            ))}
+          </div>
+
+          {/* top fade for text legibility */}
+          <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-[#0c0a14] via-transparent to-transparent" />
 
           <div className="relative z-10 flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-[#6d5cff] flex items-center justify-center overflow-hidden shrink-0">
