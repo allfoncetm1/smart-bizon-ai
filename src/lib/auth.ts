@@ -2,6 +2,7 @@ import { createHmac, createHash } from "crypto";
 import { cookies } from "next/headers";
 
 export const COOKIE_NAME = "sb_session";
+export const VIEWAS_COOKIE = "sb_viewas";
 const SECRET = process.env.NEXTAUTH_SECRET ?? "smart-bizon-secret-2026";
 
 export interface SessionPayload {
@@ -12,6 +13,19 @@ export interface SessionPayload {
   isAdmin: boolean;
   hasAccess: boolean;
   exp: number;
+}
+
+/**
+ * What every route actually works with. Same shape as SessionPayload, plus
+ * the real identity behind an admin's "view as" impersonation (if any) —
+ * userId/isAdmin above are swapped to the impersonated user's while active,
+ * so every existing `session.userId` / `session.isAdmin` check keeps working
+ * unmodified and correctly scopes to whichever account is being viewed.
+ */
+export interface EffectiveSession extends SessionPayload {
+  realUserId: string;
+  realIsAdmin: boolean;
+  viewingAsUserId: string | null;
 }
 
 function b64url(str: string): string {
@@ -60,9 +74,40 @@ export function verifyTelegramData(data: Record<string, string>): boolean {
   return expected === hash;
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
+/** Decodes only the real, logged-in identity — never swapped by "view as". */
+export async function getRawSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
   return verifySessionToken(token);
+}
+
+/**
+ * The session every route should use. For a plain user this is just their
+ * own identity. For an admin who has picked "view as" (Telegram's login
+ * widget has no way for a site to force a fresh account picker, so this is
+ * how one person manages multiple client accounts on one device instead) it
+ * transparently swaps userId/isAdmin to the target account's, so ownership
+ * checks elsewhere in the codebase scope to that account without change.
+ */
+export async function getSession(): Promise<EffectiveSession | null> {
+  const payload = await getRawSession();
+  if (!payload) return null;
+
+  const base: EffectiveSession = {
+    ...payload,
+    realUserId: payload.userId,
+    realIsAdmin: payload.isAdmin,
+    viewingAsUserId: null,
+  };
+
+  if (payload.isAdmin) {
+    const cookieStore = await cookies();
+    const viewAsUserId = cookieStore.get(VIEWAS_COOKIE)?.value;
+    if (viewAsUserId && viewAsUserId !== payload.userId) {
+      return { ...base, userId: viewAsUserId, isAdmin: false, viewingAsUserId: viewAsUserId };
+    }
+  }
+
+  return base;
 }

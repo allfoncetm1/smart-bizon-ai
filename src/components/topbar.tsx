@@ -17,6 +17,17 @@ interface Me {
   username: string | null;
   firstName: string | null;
   isAdmin: boolean;
+  realIsAdmin: boolean;
+  realUserId: string;
+  viewingAsUserId: string | null;
+  viewingAs: { username: string | null; firstName: string | null } | null;
+}
+
+interface SwitchableUser {
+  id: string;
+  username: string | null;
+  firstName: string | null;
+  hasAccess: boolean;
 }
 
 export function TopBar() {
@@ -24,8 +35,10 @@ export function TopBar() {
   const title = screenTitles[pathname] ?? "Smart Bizon AI";
   const [projectName, setProjectName] = useState<string | null>(null);
   const [me, setMe] = useState<Me | null>(null);
+  const [users, setUsers] = useState<SwitchableUser[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,7 +49,15 @@ export function TopBar() {
 
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : null))
-      .then(setMe)
+      .then((data: Me | null) => {
+        setMe(data);
+        if (data?.realIsAdmin) {
+          fetch("/api/users")
+            .then((r) => (r.ok ? r.json() : []))
+            .then(setUsers)
+            .catch(() => {});
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -59,8 +80,36 @@ export function TopBar() {
     }
   }
 
+  async function viewAs(userId: string) {
+    setSwitchingId(userId);
+    try {
+      await fetch("/api/auth/view-as", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      window.location.href = "/";
+    } finally {
+      setSwitchingId(null);
+    }
+  }
+
+  async function stopViewingAs() {
+    setSwitchingId("__stop__");
+    try {
+      await fetch("/api/auth/view-as", { method: "DELETE" });
+      window.location.href = "/";
+    } finally {
+      setSwitchingId(null);
+    }
+  }
+
   const displayName = me?.firstName ?? me?.username ?? "Аккаунт";
-  const roleLabel = me?.isAdmin ? "Администратор" : "Пользователь";
+  const roleLabel = me?.realIsAdmin ? "Администратор" : "Пользователь";
+  const viewingAsName = me?.viewingAs ? (me.viewingAs.firstName ?? me.viewingAs.username) : null;
+  const switchableUsers = users.filter(
+    (u) => u.hasAccess && u.id !== me?.realUserId && u.id !== me?.viewingAsUserId
+  );
 
   return (
     <header style={{
@@ -85,6 +134,13 @@ export function TopBar() {
           Проект: {projectName}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}><path d="M6 9l6 6 6-6" /></svg>
         </button>
+      )}
+
+      {viewingAsName && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--amberbg)", border: "1px solid color-mix(in srgb, var(--amber) 30%, transparent)", borderRadius: 10, padding: "7px 11px", fontSize: 12.5, fontWeight: 600, color: "var(--amber)" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
+          Смотрите как: {viewingAsName}
+        </div>
       )}
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
@@ -123,7 +179,7 @@ export function TopBar() {
               position: "absolute",
               top: "calc(100% + 8px)",
               right: 0,
-              minWidth: 200,
+              minWidth: 240,
               background: "var(--card)",
               border: "1px solid var(--border)",
               borderRadius: 12,
@@ -136,6 +192,44 @@ export function TopBar() {
                   @{me.username}
                 </div>
               )}
+
+              {viewingAsName && (
+                <button
+                  onClick={stopViewingAs}
+                  disabled={switchingId === "__stop__"}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 10px", border: "none", background: "transparent", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: "var(--amber)", opacity: switchingId === "__stop__" ? 0.6 : 1, textAlign: "left" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--amberbg)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                  Вернуться к своему аккаунту
+                </button>
+              )}
+
+              {me?.realIsAdmin && switchableUsers.length > 0 && (
+                <>
+                  <div style={{ padding: "8px 10px 4px", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#a3a2b0" }}>
+                    Смотреть как
+                  </div>
+                  {switchableUsers.map((u) => (
+                    <button
+                      key={u.id}
+                      onClick={() => viewAs(u.id)}
+                      disabled={switchingId === u.id}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 10px", border: "none", background: "transparent", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: "var(--text)", opacity: switchingId === u.id ? 0.6 : 1, textAlign: "left" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--soft)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--soft)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--muted)", flexShrink: 0 }}>
+                        {(u.firstName ?? u.username ?? "?").slice(0, 1).toUpperCase()}
+                      </span>
+                      {u.firstName ?? u.username ?? u.id}
+                    </button>
+                  ))}
+                  <div style={{ height: 1, background: "var(--line)", margin: "4px 0" }} />
+                </>
+              )}
+
               <button
                 onClick={handleLogout}
                 disabled={loggingOut}
@@ -159,7 +253,7 @@ export function TopBar() {
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
-                {loggingOut ? "Выходим..." : "Сменить аккаунт"}
+                {loggingOut ? "Выходим..." : "Сменить Telegram-аккаунт"}
               </button>
             </div>
           )}

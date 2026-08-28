@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     include: { agentConfig: true },
   });
 
-  if (!project || (project.userId !== session.userId && !session.isAdmin)) {
+  if (!project || project.userId !== session.userId) {
     return NextResponse.json({ error: "Проект не найден" }, { status: 404 });
   }
 

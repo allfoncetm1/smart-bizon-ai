@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
-import { getSession } from "@/lib/auth";
+import { getRawSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const session = await getSession();
+  const session = await getRawSession();
   if (!session?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(req.url);

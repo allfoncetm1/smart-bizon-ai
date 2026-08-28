@@ -27,7 +27,7 @@ export async function GET(
     },
   });
 
-  if (!webinar || (webinar.project.userId !== session.userId && !session.isAdmin)) {
+  if (!webinar || webinar.project.userId !== session.userId) {
     return NextResponse.json({ error: "Не найден" }, { status: 404 });
   }
 

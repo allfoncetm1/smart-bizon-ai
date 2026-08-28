@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession, type SessionPayload } from "@/lib/auth";
+import { getSession, type EffectiveSession } from "@/lib/auth";
 
 function getOrigin(req: NextRequest) {
   const proto = req.headers.get("x-forwarded-proto") ?? "https";
@@ -8,13 +8,13 @@ function getOrigin(req: NextRequest) {
   return `${proto}://${host}`;
 }
 
-async function getOwnedRedirect(id: string, session: SessionPayload) {
+async function getOwnedRedirect(id: string, session: EffectiveSession) {
   const link = await prisma.linkRedirect.findUnique({
     where: { id },
     include: { project: { select: { userId: true } } },
   });
   if (!link) return null;
-  if (link.project.userId !== session.userId && !session.isAdmin) return null;
+  if (link.project.userId !== session.userId) return null;
   return link;
 }
 
