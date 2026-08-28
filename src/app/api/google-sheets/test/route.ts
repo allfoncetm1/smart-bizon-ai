@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
+import { getSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
+  const session = await getSession();
+  if (!session?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const { searchParams } = new URL(req.url);
   const sheetId = searchParams.get("sheetId");
 

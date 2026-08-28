@@ -4,9 +4,17 @@ import { createBizon365Client } from "@/lib/bizon365";
 import { moderateChatMessages, generateWebinarSummary, generateAutoAnswer, generateLeadCards } from "@/lib/ai-agent";
 import { notifyHotLead, notifyWebinarDone } from "@/lib/telegram";
 import { appendLeadsToSheet } from "@/lib/google-sheets";
+import { getSession } from "@/lib/auth";
 import type { BizonChatMessage, BizonViewer } from "@/lib/bizon365";
 
+type ProjectWithConfig = NonNullable<Awaited<ReturnType<typeof prisma.project.findUnique>>> & {
+  agentConfig: Awaited<ReturnType<typeof prisma.agentConfig.findUnique>>;
+};
+
 export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { projectId, webinarId } = await req.json();
 
   const project = await prisma.project.findUnique({
@@ -14,10 +22,22 @@ export async function POST(req: NextRequest) {
     include: { agentConfig: true },
   });
 
-  if (!project) {
+  if (!project || (project.userId !== session.userId && !session.isAdmin)) {
     return NextResponse.json({ error: "Проект не найден" }, { status: 404 });
   }
 
+  const webinar = await startSync(project, webinarId);
+
+  return NextResponse.json({ success: true, started: true, webinarId: webinar.id });
+}
+
+/**
+ * Marks the webinar as PROCESSING and kicks off the (potentially
+ * multi-minute) AI sync in the background. Shared by the POST handler
+ * above (user-triggered, session already checked) and the auto-sync cron
+ * route (no session — it already owns the `project` row it passes in).
+ */
+export async function startSync(project: ProjectWithConfig, webinarId: string) {
   // Отмечаем как "в обработке" и сразу отвечаем — сама обработка (AI-модерация,
   // скоринг, карточки лидов) может занимать несколько минут и не укладывается
   // в таймаут прокси (Cloudflare обрывает соединение на 100-й секунде).
@@ -42,15 +62,10 @@ export async function POST(req: NextRequest) {
     }).catch(() => {});
   });
 
-  return NextResponse.json({ success: true, started: true, webinarId: webinar.id });
+  return webinar;
 }
 
-async function runSync(
-  project: NonNullable<Awaited<ReturnType<typeof prisma.project.findUnique>>> & {
-    agentConfig: Awaited<ReturnType<typeof prisma.agentConfig.findUnique>>;
-  },
-  webinarId: string
-) {
+async function runSync(project: ProjectWithConfig, webinarId: string) {
     const bizon = createBizon365Client(project.apiToken, project.bizonId);
     const config = project.agentConfig;
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createBizon365Client } from "@/lib/bizon365";
+import { startSync } from "@/app/api/webinars/sync/route";
 
 // Вызывается Vercel Cron — авторизуется через Authorization: Bearer <CRON_SECRET>
 // Запасной вариант: ?secret=<CRON_SECRET> в URL
@@ -42,17 +43,8 @@ export async function GET(req: NextRequest) {
         // Пропускаем уже готовые и те что в обработке прямо сейчас
         if (existing?.status === "DONE" || existing?.status === "PROCESSING") continue;
 
-        const baseUrl = process.env.NEXTAUTH_URL ?? process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : "http://localhost:3000";
-
-        const syncRes = await fetch(`${baseUrl}/api/webinars/sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId: project.id, webinarId: item.webinarId }),
-        });
-
-        if (syncRes.ok) newCount++;
+        await startSync(project, item.webinarId);
+        newCount++;
       }
 
       results.push({ projectId: project.id, synced: newCount });

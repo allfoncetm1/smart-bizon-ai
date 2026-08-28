@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -9,7 +10,11 @@ const createSchema = z.object({
 });
 
 export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const projects = await prisma.project.findMany({
+    where: { userId: session.userId },
     include: {
       agentConfig: true,
       _count: { select: { webinars: true, leads: true } },
@@ -21,6 +26,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const body = await req.json();
     const data = createSchema.parse(body);
@@ -28,6 +36,7 @@ export async function POST(req: NextRequest) {
     const project = await prisma.project.create({
       data: {
         ...data,
+        userId: session.userId,
         agentConfig: {
           create: {},
         },

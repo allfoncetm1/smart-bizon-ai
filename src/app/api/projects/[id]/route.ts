@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { getOwnedProject } from "@/lib/ownership";
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await params;
+
+  const project = await getOwnedProject(id, session);
+  if (!project) return NextResponse.json({ error: "Проект не найден" }, { status: 404 });
 
   try {
     // Удаляем в правильном порядке из-за FK

@@ -5,6 +5,7 @@ export const COOKIE_NAME = "sb_session";
 const SECRET = process.env.NEXTAUTH_SECRET ?? "smart-bizon-secret-2026";
 
 export interface SessionPayload {
+  userId: string;
   telegramId: string;
   username?: string;
   firstName?: string;

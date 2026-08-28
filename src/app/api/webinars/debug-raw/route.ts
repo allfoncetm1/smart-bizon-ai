@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { getOwnedProject } from "@/lib/ownership";
 import axios from "axios";
 
 export async function GET(req: NextRequest) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { searchParams } = new URL(req.url);
   const webinarId = searchParams.get("webinarId");
   const projectId = searchParams.get("projectId");
@@ -11,7 +15,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "webinarId and projectId required" }, { status: 400 });
   }
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  const project = await getOwnedProject(projectId, session);
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   const { data } = await axios.get(

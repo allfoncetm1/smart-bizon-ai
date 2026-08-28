@@ -10,8 +10,22 @@ cd /var/www/smart-bizon-ai
 echo "==> git pull"
 git pull origin wait-for-db
 
+# This script may have just changed on disk (e.g. this very pull). Bash reads
+# scripts incrementally, so continuing to execute a file that was rewritten
+# underneath it is undefined behavior. Re-exec the (possibly new) copy once,
+# with a guard so this can't loop forever.
+if [ -z "$SB_DEPLOY_REEXEC" ]; then
+  SB_DEPLOY_REEXEC=1 exec bash "$0" "$@"
+fi
+
 echo "==> npm install"
 npm install --no-audit --no-fund
+
+echo "==> prisma generate"
+npx prisma generate
+
+echo "==> prisma migrate deploy"
+npx prisma migrate deploy
 
 echo "==> stopping app/nginx/postgres for build headroom"
 pm2 stop smart-bizon-ai || true

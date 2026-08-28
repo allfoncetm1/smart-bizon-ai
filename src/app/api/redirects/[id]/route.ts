@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession, type SessionPayload } from "@/lib/auth";
 
 function getOrigin(req: NextRequest) {
   const proto = req.headers.get("x-forwarded-proto") ?? "https";
@@ -7,8 +8,26 @@ function getOrigin(req: NextRequest) {
   return `${proto}://${host}`;
 }
 
+async function getOwnedRedirect(id: string, session: SessionPayload) {
+  const link = await prisma.linkRedirect.findUnique({
+    where: { id },
+    include: { project: { select: { userId: true } } },
+  });
+  if (!link) return null;
+  if (link.project.userId !== session.userId && !session.isAdmin) return null;
+  return link;
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await params;
+
+  if (!(await getOwnedRedirect(id, session))) {
+    return NextResponse.json({ error: "Не найдено" }, { status: 404 });
+  }
+
   const body = await req.json();
   const { slug, destinationUrl, ogTitle, ogDescription, ogImageUrl, ogImageBlob, ogImageMime, isActive } = body;
 
@@ -41,8 +60,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json(link);
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await params;
+
+  if (!(await getOwnedRedirect(id, session))) {
+    return NextResponse.json({ error: "Не найдено" }, { status: 404 });
+  }
+
   await prisma.linkRedirect.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

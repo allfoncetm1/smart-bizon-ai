@@ -9,16 +9,20 @@ datasource db {
 
 model Project {
   id          String   @id @default(cuid())
+  userId      String
   name        String
   bizonId     String   @unique
   apiToken    String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  user          User           @relation(fields: [userId], references: [id])
   webinars      Webinar[]
   leads         Lead[]
   agentConfig   AgentConfig?
   linkRedirects LinkRedirect[]
+
+  @@index([userId])
 }
 
 model Webinar {
@@ -139,6 +143,8 @@ model User {
   lastLoginAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  projects    Project[]
 }
 
 model LinkRedirect {

@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
   }
 
   const token = createSessionToken({
+    userId: user.id,
     telegramId: user.telegramId,
     username: user.username ?? undefined,
     firstName: user.firstName ?? undefined,

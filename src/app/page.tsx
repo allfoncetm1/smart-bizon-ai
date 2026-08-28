@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 import { StatsCard } from "@/components/stats-card";
 import { RecentWebinars } from "@/components/recent-webinars";
 import { SegmentChart } from "@/components/segment-chart";
@@ -6,7 +7,13 @@ import Link from "next/link";
 
 async function getDashboardData() {
   try {
-    const project = await prisma.project.findFirst({ orderBy: { createdAt: "desc" } });
+    const session = await getSession();
+    if (!session) return null;
+
+    const project = await prisma.project.findFirst({
+      where: { userId: session.userId },
+      orderBy: { createdAt: "desc" },
+    });
     if (!project) return null;
 
     const [totalWebinars, totalLeads, hotLeads, warmLeads, recentWebinars, segmentStats] =
