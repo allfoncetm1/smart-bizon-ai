@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 
 const screenTitles: Record<string, string> = {
@@ -13,17 +13,54 @@ const screenTitles: Record<string, string> = {
   "/settings": "Настройки",
 };
 
+interface Me {
+  username: string | null;
+  firstName: string | null;
+  isAdmin: boolean;
+}
+
 export function TopBar() {
   const pathname = usePathname();
   const title = screenTitles[pathname] ?? "Smart Bizon AI";
   const [projectName, setProjectName] = useState<string | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/projects")
       .then((r) => (r.ok ? r.json() : []))
       .then((projects) => { if (projects[0]) setProjectName(projects[0].name); })
       .catch(() => {});
+
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setMe)
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      // Полная перезагрузка вместо роутинга — сбрасывает весь клиентский
+      // стейт/кэш, чтобы данные предыдущего аккаунта нигде не задержались.
+      window.location.href = "/login";
+    }
+  }
+
+  const displayName = me?.firstName ?? me?.username ?? "Аккаунт";
+  const roleLabel = me?.isAdmin ? "Администратор" : "Пользователь";
 
   return (
     <header style={{
@@ -66,14 +103,66 @@ export function TopBar() {
         <div style={{ width: 1, height: 26, background: "var(--border)" }} />
 
         {/* User */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            <img src="/logo.png" alt="SB" style={{ width: 26, height: 26, objectFit: "contain" }} />
+        <div ref={menuRef} style={{ position: "relative" }}>
+          <div
+            onClick={() => setMenuOpen((v) => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+          >
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              <img src="/logo.png" alt="SB" style={{ width: 26, height: 26, objectFit: "contain" }} />
+            </div>
+            <div style={{ lineHeight: 1.2 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{displayName}</div>
+              <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{roleLabel}</div>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}><path d="M6 9l6 6 6-6" /></svg>
           </div>
-          <div style={{ lineHeight: 1.2 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Smart Bizon</div>
-            <div style={{ fontSize: 11.5, color: "var(--muted)" }}>Администратор</div>
-          </div>
+
+          {menuOpen && (
+            <div style={{
+              position: "absolute",
+              top: "calc(100% + 8px)",
+              right: 0,
+              minWidth: 200,
+              background: "var(--card)",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              boxShadow: "0 8px 24px rgba(20,20,50,.12)",
+              padding: 6,
+              zIndex: 40,
+            }}>
+              {me?.username && (
+                <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--muted)", borderBottom: "1px solid var(--line)", marginBottom: 4 }}>
+                  @{me.username}
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                disabled={loggingOut}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 10px",
+                  border: "none",
+                  background: "transparent",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--red)",
+                  opacity: loggingOut ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--redbg)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
+                {loggingOut ? "Выходим..." : "Сменить аккаунт"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
