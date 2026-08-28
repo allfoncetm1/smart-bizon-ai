@@ -38,6 +38,11 @@ export function verifySessionToken(token: string): SessionPayload | null {
     if (sig !== expected) return null;
     const payload = JSON.parse(fromB64url(body)) as SessionPayload;
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+    // Tokens issued before multi-tenancy was added don't carry userId. Reject
+    // them explicitly rather than letting `undefined` silently disable
+    // Prisma's `where: { userId }` filters (Prisma ignores undefined values,
+    // which would turn a "my projects only" query into "all projects").
+    if (!payload.userId) return null;
     return payload;
   } catch {
     return null;
