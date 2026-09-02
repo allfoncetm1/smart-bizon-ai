@@ -24,7 +24,6 @@ const inputStyle: React.CSSProperties = { width: "100%", border: "1px solid var(
 const labelStyle: React.CSSProperties = { display: "block", fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" };
 
 export default function RedirectsPage() {
-  const [projectId, setProjectId] = useState("");
   const [links, setLinks] = useState<LinkRedirect[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -35,12 +34,9 @@ export default function RedirectsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/projects").then((r) => (r.ok ? r.json() : [])).then((projects) => {
-      const pid = projects[0]?.id;
-      if (!pid) return;
-      setProjectId(pid);
-      fetch(`/api/redirects?projectId=${pid}`).then((r) => (r.ok ? r.json() : [])).then(setLinks);
-    }).catch(console.error);
+    // Link Preview принадлежит аккаунту напрямую — работает и без
+    // подключённого Bizon365-проекта.
+    fetch("/api/redirects").then((r) => (r.ok ? r.json() : [])).then(setLinks).catch(console.error);
   }, []);
 
   function openCreate() { setForm({ ...EMPTY_FORM, slug: randomSlug() }); setEditId(null); setError(""); setShowForm(true); }
@@ -51,7 +47,7 @@ export default function RedirectsPage() {
     if (!form.destinationUrl || !form.slug) { setError("Заполните slug и URL назначения"); return; }
     setSaving(true); setError("");
     try {
-      const body = { ...form, projectId };
+      const body = { ...form };
       const res = editId
         ? await fetch(`/api/redirects/${editId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
         : await fetch("/api/redirects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

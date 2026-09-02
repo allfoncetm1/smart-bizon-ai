@@ -9,12 +9,8 @@ function getOrigin(req: NextRequest) {
 }
 
 async function getOwnedRedirect(id: string, session: EffectiveSession) {
-  const link = await prisma.linkRedirect.findUnique({
-    where: { id },
-    include: { project: { select: { userId: true } } },
-  });
-  if (!link) return null;
-  if (link.project.userId !== session.userId) return null;
+  const link = await prisma.linkRedirect.findUnique({ where: { id } });
+  if (!link || link.userId !== session.userId) return null;
   return link;
 }
 

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { ownsProject } from "@/lib/ownership";
 
 function getOrigin(req: NextRequest) {
   const proto = req.headers.get("x-forwarded-proto") ?? "https";
@@ -13,15 +12,10 @@ export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const projectId = req.nextUrl.searchParams.get("projectId");
-  if (!projectId) return NextResponse.json([]);
-
-  if (!(await ownsProject(projectId, session))) {
-    return NextResponse.json({ error: "Проект не найден" }, { status: 404 });
-  }
-
+  // Link Preview belongs to the account, not to a connected Bizon365
+  // project — works the same whether or not one is set up.
   const links = await prisma.linkRedirect.findMany({
-    where: { projectId },
+    where: { userId: session.userId },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(links);
@@ -32,14 +26,10 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { projectId, slug, destinationUrl, ogTitle, ogDescription, ogImageUrl, ogImageBlob, ogImageMime } = body;
+  const { slug, destinationUrl, ogTitle, ogDescription, ogImageUrl, ogImageBlob, ogImageMime } = body;
 
-  if (!projectId || !slug || !destinationUrl) {
+  if (!slug || !destinationUrl) {
     return NextResponse.json({ error: "Заполните обязательные поля" }, { status: 400 });
-  }
-
-  if (!(await ownsProject(projectId, session))) {
-    return NextResponse.json({ error: "Проект не найден" }, { status: 404 });
   }
 
   const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
@@ -53,7 +43,7 @@ export async function POST(req: NextRequest) {
   }
 
   const link = await prisma.linkRedirect.create({
-    data: { projectId, slug: cleanSlug, destinationUrl, ogTitle, ogDescription, ogImageUrl, ogImageBlob, ogImageMime },
+    data: { userId: session.userId, slug: cleanSlug, destinationUrl, ogTitle, ogDescription, ogImageUrl, ogImageBlob, ogImageMime },
   });
 
   // If image was uploaded as blob — set its serving URL
