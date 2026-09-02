@@ -7,9 +7,10 @@ import { TopBar } from "./topbar";
 export function SidebarWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isRedirectPage = pathname.startsWith("/r/");
+  const isEntryFormPage = pathname.startsWith("/j/");
   const isLoginPage = pathname.startsWith("/login");
 
-  if (isRedirectPage || isLoginPage) {
+  if (isRedirectPage || isEntryFormPage || isLoginPage) {
     return <>{children}</>;
   }
 

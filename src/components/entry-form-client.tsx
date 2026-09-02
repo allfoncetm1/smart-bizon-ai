@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { toE164 } from "@/lib/bizon-room";
 
 interface Props {
@@ -15,7 +15,6 @@ export function EntryFormClient({ bizonRoomUrl, title, speaker, dateLabel }: Pro
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,20 +24,27 @@ export function EntryFormClient({ bizonRoomUrl, title, speaker, dateLabel }: Pro
     const e164 = toE164(phone);
     if (!e164) { setError("Введите корректный номер телефона"); return; }
 
+    // A tiny popup that itself top-level-navigates to Bizon's `authorize`
+    // endpoint. This — not a hidden iframe — is what makes the cookie
+    // stick: modern browsers (Safari/Firefox always, Chrome increasingly)
+    // block cookies set inside a cross-site *iframe* as third-party, but a
+    // popup doing its own top-level navigation is a first-party context to
+    // itself, so the cookie is accepted normally. It's shared with every
+    // other tab in the same browser, so once it lands we close the popup
+    // and send the main tab straight into the room.
+    // Must open synchronously inside this click handler or popup blockers
+    // will kill it.
+    const popup = window.open("about:blank", "bizon-auth", "width=480,height=560");
+    if (!popup) {
+      setError("Браузер заблокировал всплывающее окно — разрешите его для этого сайта и попробуйте ещё раз");
+      return;
+    }
+
     setSubmitting(true);
 
-    // Real <form> POST into a hidden iframe, targeting Bizon's own
-    // `authorize` endpoint directly — a genuine cross-site navigation, not
-    // fetch/XHR, so it isn't subject to CORS. Bizon sets its session cookie
-    // in the visitor's browser as a normal side effect of that POST.
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const form = document.createElement("form");
+    const form = popup.document.createElement("form");
     form.method = "POST";
     form.action = `${bizonRoomUrl}/authorize?_csrf=`;
-    form.target = iframe.name;
-    form.style.display = "none";
 
     const fields: Record<string, string> = {
       username: name.trim().slice(0, 30),
@@ -54,23 +60,21 @@ export function EntryFormClient({ bizonRoomUrl, title, speaker, dateLabel }: Pro
       sup: "",
     };
     for (const [key, value] of Object.entries(fields)) {
-      const input = document.createElement("input");
+      const input = popup.document.createElement("input");
       input.type = "hidden";
       input.name = key;
       input.value = value;
       form.appendChild(input);
     }
-    document.body.appendChild(form);
+    popup.document.body.appendChild(form);
     form.submit();
-    form.remove();
 
-    // Give Bizon a moment to process the POST and set the cookie, then send
-    // the visitor's actual tab into the room — a top-level navigation, so
-    // the freshly-set session cookie is sent along and they land straight
-    // in the live room instead of Bizon's own entry form.
+    // Give Bizon a moment to process the POST and set the cookie, then
+    // close the popup and send the visitor's real tab into the room.
     window.setTimeout(() => {
+      try { popup.close(); } catch { /* ignore */ }
       window.location.href = bizonRoomUrl;
-    }, 900);
+    }, 1200);
   }
 
   return (
@@ -133,8 +137,6 @@ export function EntryFormClient({ bizonRoomUrl, title, speaker, dateLabel }: Pro
           Заполняя форму, вы соглашаетесь на обработку персональных данных
         </p>
       </div>
-
-      <iframe ref={iframeRef} name="bizon-auth-frame" title="" style={{ display: "none" }} />
     </div>
   );
 }
