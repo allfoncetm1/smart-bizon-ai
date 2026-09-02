@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const COOKIE_NAME = "sb_session";
 const SECRET = process.env.NEXTAUTH_SECRET ?? "smart-bizon-secret-2026";
 
-const PUBLIC = ["/login", "/r/", "/api/auth/", "/api/og-image/", "/_next/", "/favicon", "/banner"];
+const PUBLIC = ["/login", "/r/", "/j/", "/api/auth/", "/api/og-image/", "/_next/", "/favicon", "/banner"];
 
 async function verifyJWT(token: string): Promise<{ hasAccess: boolean; isAdmin: boolean } | null> {
   try {
