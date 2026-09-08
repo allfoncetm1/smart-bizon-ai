@@ -3,9 +3,18 @@ import { NextRequest, NextResponse } from "next/server";
 const COOKIE_NAME = "sb_session";
 const SECRET = process.env.NEXTAUTH_SECRET ?? "smart-bizon-secret-2026";
 
-const PUBLIC = ["/login", "/r/", "/j/", "/api/auth/", "/api/og-image/", "/_next/", "/favicon", "/banner"];
+// Публичные пути (без сессии). /api/payments/ — вебхук ApiPay, он проверяет
+// свою подпись сам. /api/auth/ покрывает и /api/auth/refresh.
+const PUBLIC = ["/login", "/r/", "/j/", "/api/auth/", "/api/payments/", "/api/og-image/", "/_next/", "/favicon", "/banner"];
 
-async function verifyJWT(token: string): Promise<{ hasAccess: boolean; isAdmin: boolean } | null> {
+interface JWTClaims {
+  hasAccess: boolean;
+  isAdmin: boolean;
+  accessVia?: "trial" | "paid" | "admin";
+  trialEndsAt?: number | null;
+}
+
+async function verifyJWT(token: string): Promise<JWTClaims | null> {
   try {
     const [header, body, sig] = token.split(".");
     if (!header || !body || !sig) return null;
@@ -22,7 +31,12 @@ async function verifyJWT(token: string): Promise<{ hasAccess: boolean; isAdmin: 
     const payload = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
 
-    return { hasAccess: payload.hasAccess, isAdmin: payload.isAdmin };
+    return {
+      hasAccess: payload.hasAccess,
+      isAdmin: payload.isAdmin,
+      accessVia: payload.accessVia,
+      trialEndsAt: payload.trialEndsAt,
+    };
   } catch {
     return null;
   }
@@ -41,9 +55,22 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (!payload.hasAccess) {
-    if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
-    return NextResponse.redirect(new URL("/login?denied=1", req.url));
+  // Триал истёк — доступ закрыт, пока не оплатят. Проверка — по времени в токене,
+  // без обращения к БД (middleware работает на Edge).
+  const trialExpired =
+    payload.accessVia === "trial" &&
+    typeof payload.trialEndsAt === "number" &&
+    payload.trialEndsAt > 0 &&
+    payload.trialEndsAt * 1000 < Date.now();
+  const denied = !payload.hasAccess || trialExpired;
+
+  if (denied) {
+    // Саму страницу оплаты и её API всегда оставляем доступными.
+    if (pathname === "/billing" || pathname.startsWith("/api/billing/")) return NextResponse.next();
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Требуется оплата", code: "payment_required" }, { status: 402 });
+    }
+    return NextResponse.redirect(new URL("/billing", req.url));
   }
 
   return NextResponse.next();

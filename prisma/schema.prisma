@@ -147,6 +147,8 @@ model User {
   projects      Project[]
   linkRedirects LinkRedirect[]
   entryForms    EntryForm[]
+  subscription  Subscription?
+  payments      Payment[]
 }
 
 model LinkRedirect {
@@ -217,6 +219,92 @@ model AgentConfig {
   updatedAt          DateTime @updatedAt
 
   project            Project  @relation(fields: [projectId], references: [id])
+}
+
+// Оплата доступа к платформе через ApiPay (Kaspi). Автосписания у Kaspi нет:
+// каждый период клиент оплачивает новый счёт вручную. Продление — ручное,
+// доступ автоматически не закрывается (решает админ в /settings).
+model Subscription {
+  id               String             @id @default(cuid())
+  userId           String             @unique
+  status           SubscriptionStatus @default(TRIALING)
+  accessVia        AccessVia          @default(TRIAL)
+  plan             PlanId?
+  phone            String? // номер Kaspi для счетов «по телефону», формат 8XXXXXXXXXX
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime? // до какой даты оплачен доступ (для отображения)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+}
+
+// Один счёт ApiPay. id == external_order_id, который мы передаём в ApiPay.
+model Payment {
+  id              String        @id @default(cuid())
+  userId          String
+  subscriptionId  String
+  plan            PlanId
+  method          PayMethod
+  amount          Int // целые тенге
+  status          PaymentStatus @default(PENDING)
+  apipayInvoiceId String?       @unique // invoice.id из ответа/вебхука ApiPay
+  kaspiInvoiceId  String?
+  qrTokenUrl      String?
+  qrImageUrl      String?
+  isSandbox       Boolean       @default(false)
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Журнал + дедупликация входящих вебхуков ApiPay. dedupeKey уникален,
+// повторная доставка того же события — no-op.
+model WebhookEvent {
+  id         String   @id @default(cuid())
+  provider   String   @default("apipay")
+  event      String
+  dedupeKey  String   @unique
+  payload    Json
+  receivedAt DateTime @default(now())
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum AccessVia {
+  TRIAL
+  PAID
+  ADMIN
+}
+
+enum PlanId {
+  MONTHLY
+  YEARLY
+}
+
+enum PayMethod {
+  QR
+  PHONE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
+  EXPIRED
+  ERROR
+  REFUNDED
 }
 
 enum WebinarType {

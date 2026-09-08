@@ -11,6 +11,7 @@ const screenTitles: Record<string, string> = {
   "/redirects": "Link Preview",
   "/entry-forms": "Формы входа",
   "/agent": "Настройки агента",
+  "/billing": "Подписка",
   "/settings": "Настройки",
 };
 

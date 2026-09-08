@@ -27,6 +27,12 @@ services:
         sync: false
       - key: NEXT_PUBLIC_APP_URL
         value: https://smartbizon.online
+      - key: APIPAY_API_BASE
+        value: https://api.apipay.kz/api/v1
+      - key: APIPAY_API_KEY
+        sync: false
+      - key: APIPAY_WEBHOOK_SECRET
+        sync: false
 
 databases:
   - name: smart-bizon-db

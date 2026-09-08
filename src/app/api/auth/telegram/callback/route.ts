@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyTelegramData, createSessionToken, COOKIE_NAME } from "@/lib/auth";
+import { ensureSubscription, isTrialActive, resolveAccess } from "@/lib/billing";
 
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID ?? "6371272028";
 
@@ -39,15 +40,21 @@ export async function GET(req: NextRequest) {
       lastName: params.last_name ?? null,
       photoUrl: params.photo_url ?? null,
       isAdmin,
-      hasAccess: isAdmin,
+      hasAccess: true, // новому пользователю сразу открываем 3-дневный триал
       lastLoginAt: new Date(),
     },
   });
 
-  if (!user.hasAccess) {
-    return NextResponse.redirect(`${origin}/login?denied=1`);
+  // Заводим подписку (триал, если её ещё нет) и синхронизируем hasAccess.
+  const sub = await ensureSubscription(user.id, isAdmin);
+  const shouldHaveAccess =
+    isAdmin || sub.accessVia === "ADMIN" || sub.accessVia === "PAID" || isTrialActive(sub);
+  if (shouldHaveAccess && !user.hasAccess) {
+    await prisma.user.update({ where: { id: user.id }, data: { hasAccess: true } });
+    user.hasAccess = true;
   }
 
+  const access = resolveAccess(sub);
   const token = createSessionToken({
     userId: user.id,
     telegramId: user.telegramId,
@@ -55,9 +62,18 @@ export async function GET(req: NextRequest) {
     firstName: user.firstName ?? undefined,
     isAdmin: user.isAdmin,
     hasAccess: user.hasAccess,
+    accessVia: access.accessVia,
+    trialEndsAt: access.trialEndsAt,
   });
 
-  const res = NextResponse.redirect(`${origin}/`);
+  const trialExpired =
+    access.accessVia === "trial" &&
+    access.trialEndsAt !== null &&
+    access.trialEndsAt > 0 &&
+    access.trialEndsAt * 1000 < Date.now();
+  const dest = user.hasAccess && !trialExpired ? "/" : "/billing";
+
+  const res = NextResponse.redirect(`${origin}${dest}`);
   res.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
