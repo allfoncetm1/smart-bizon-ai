@@ -1,20 +1,19 @@
 // Клиент ApiPay (https://apipay.kz) — приём платежей через Kaspi.
 // Док: https://apipay.kz/docs.html — счета (/invoices, /invoices/qr) и вебхуки.
+// Ключи берутся из AppConfig (БД), иначе из env — см. getApipayConfig().
 
 import { createHmac, timingSafeEqual } from "crypto";
-
-const API_BASE = process.env.APIPAY_API_BASE ?? "https://api.apipay.kz/api/v1";
-const API_KEY = process.env.APIPAY_API_KEY ?? "";
-const WEBHOOK_SECRET = process.env.APIPAY_WEBHOOK_SECRET ?? "";
+import { getApipayConfig } from "@/lib/app-config";
 
 /**
  * Проверка подписи вебхука. ApiPay присылает заголовок
  * `X-Webhook-Signature: sha256=<hex>` — это HMAC-SHA256 от СЫРОГО тела запроса
  * с секретом из дашборда. Сравнение — постоянное по времени.
  */
-export function verifyWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {
-  if (!WEBHOOK_SECRET || !signatureHeader) return false;
-  const expected = "sha256=" + createHmac("sha256", WEBHOOK_SECRET).update(rawBody, "utf8").digest("hex");
+export async function verifyWebhookSignature(rawBody: string, signatureHeader: string | null): Promise<boolean> {
+  const { webhookSecret } = await getApipayConfig();
+  if (!webhookSecret || !signatureHeader) return false;
+  const expected = "sha256=" + createHmac("sha256", webhookSecret).update(rawBody, "utf8").digest("hex");
   const got = Buffer.from(signatureHeader);
   const exp = Buffer.from(expected);
   if (got.length !== exp.length) return false;
@@ -42,11 +41,12 @@ interface ApiPayInvoice {
 }
 
 async function post(path: string, body: Record<string, unknown>): Promise<ApiPayInvoice> {
-  if (!API_KEY) throw new Error("APIPAY_API_KEY не задан в env");
-  const res = await fetch(`${API_BASE}${path}`, {
+  const { apiBase, apiKey } = await getApipayConfig();
+  if (!apiKey) throw new Error("ApiPay: не задан API-ключ (в /admin → Платежи или в env)");
+  const res = await fetch(`${apiBase}${path}`, {
     method: "POST",
     headers: {
-      "X-API-Key": API_KEY,
+      "X-API-Key": apiKey,
       "Content-Type": "application/json",
       "Idempotency-Key": String(body.external_order_id ?? ""),
     },

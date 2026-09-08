@@ -2,10 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PLANS } from "@/lib/plans";
 
 type PlanKey = "MONTHLY" | "YEARLY";
 type Method = "QR" | "PHONE";
+
+interface PlanInfo {
+  id: PlanKey;
+  label: string;
+  days: number;
+  amount: number;
+}
 
 interface Invoice {
   id: string;
@@ -28,6 +34,11 @@ interface StatusResp {
   lastPayment: Invoice | null;
 }
 
+interface ConfigResp {
+  payMethods: Method[];
+  plans: Record<PlanKey, PlanInfo>;
+}
+
 const card: React.CSSProperties = {
   background: "var(--card)",
   border: "1px solid var(--border)",
@@ -48,6 +59,7 @@ function daysLeft(s: string | null): number {
 
 export default function BillingPage() {
   const [sub, setSub] = useState<StatusResp["subscription"]>(null);
+  const [cfg, setCfg] = useState<ConfigResp | null>(null);
   const [plan, setPlan] = useState<PlanKey>("MONTHLY");
   const [method, setMethod] = useState<Method>("QR");
   const [phone, setPhone] = useState("");
@@ -61,7 +73,6 @@ export default function BillingPage() {
       .catch(() => null);
   }
 
-  // Первичная загрузка: показываем текущую подписку и восстанавливаем неоплаченный счёт.
   useEffect(() => {
     let alive = true;
     fetchStatus().then((data) => {
@@ -69,10 +80,17 @@ export default function BillingPage() {
       setSub(data.subscription);
       if (data.lastPayment && data.lastPayment.status === "PENDING") setInvoice(data.lastPayment);
     });
+    fetch("/api/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: ConfigResp | null) => {
+        if (!alive || !d) return;
+        setCfg(d);
+        if (d.payMethods.length && !d.payMethods.includes("QR")) setMethod(d.payMethods[0]);
+      })
+      .catch(() => {});
     return () => { alive = false; };
   }, []);
 
-  // Пока есть неоплаченный счёт — опрашиваем статус раз в 3 секунды.
   useEffect(() => {
     if (!invoice) return;
     const invoiceId = invoice.id;
@@ -112,7 +130,7 @@ export default function BillingPage() {
         status: "PENDING",
         method,
         plan,
-        amount: PLANS[plan].amount,
+        amount: cfg?.plans[plan].amount ?? 0,
         qrTokenUrl: data.qrTokenUrl ?? null,
         qrImageUrl: data.qrImageUrl ?? null,
       });
@@ -123,10 +141,13 @@ export default function BillingPage() {
     }
   }
 
-  const trialActive = sub?.accessVia === "TRIAL" && !!sub.trialEndsAt && new Date(sub.trialEndsAt) > new Date();
-  const trialOver = sub?.accessVia === "TRIAL" && (!sub.trialEndsAt || new Date(sub.trialEndsAt) <= new Date());
+  const timed = sub?.accessVia === "TRIAL" || sub?.accessVia === "COMP";
+  const timedActive = timed && !!sub?.trialEndsAt && new Date(sub.trialEndsAt) > new Date();
+  const timedOver = timed && (!sub?.trialEndsAt || new Date(sub!.trialEndsAt) <= new Date());
   const paidActive = sub?.accessVia === "PAID" || sub?.accessVia === "ADMIN";
-  const showPicker = !invoice && (!paidActive || trialOver);
+  const methods: Method[] = cfg?.payMethods.length ? cfg.payMethods : ["QR", "PHONE"];
+  const showPicker = !invoice && (!paidActive || timedOver);
+  const label = sub?.accessVia === "COMP" ? "Доступ" : "Пробный период";
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18 }}>
@@ -144,18 +165,18 @@ export default function BillingPage() {
           style={{
             ...card,
             padding: "14px 18px",
-            background: trialOver ? "var(--redbg)" : paidActive ? "var(--greenbg)" : "var(--soft)",
-            borderColor: trialOver
+            background: timedOver ? "var(--redbg)" : paidActive || timedActive ? "var(--greenbg)" : "var(--soft)",
+            borderColor: timedOver
               ? "color-mix(in srgb, var(--red) 30%, transparent)"
-              : paidActive
+              : paidActive || timedActive
               ? "color-mix(in srgb, var(--green) 30%, transparent)"
               : "var(--border)",
           }}
         >
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: trialOver ? "var(--red)" : paidActive ? "var(--green)" : "var(--text)" }}>
+          <span style={{ fontSize: 13.5, fontWeight: 600, color: timedOver ? "var(--red)" : paidActive || timedActive ? "var(--green)" : "var(--text)" }}>
             {paidActive && (sub.currentPeriodEnd ? `Подписка активна до ${fmtDate(sub.currentPeriodEnd)}` : "Доступ открыт")}
-            {trialActive && `Пробный период — осталось ${daysLeft(sub.trialEndsAt)} дн. (до ${fmtDate(sub.trialEndsAt)})`}
-            {trialOver && "Пробный период закончился — оплатите подписку, чтобы продолжить"}
+            {timedActive && `${label} — осталось ${daysLeft(sub.trialEndsAt)} дн. (до ${fmtDate(sub.trialEndsAt)})`}
+            {timedOver && `${label} закончился — оплатите подписку, чтобы продолжить`}
           </span>
         </div>
       )}
@@ -197,11 +218,11 @@ export default function BillingPage() {
         </div>
       )}
 
-      {showPicker && (
+      {showPicker && cfg && (
         <div style={{ ...card, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            {(Object.keys(PLANS) as PlanKey[]).map((k) => {
-              const p = PLANS[k];
+            {(Object.keys(cfg.plans) as PlanKey[]).map((k) => {
+              const p = cfg.plans[k];
               const active = plan === k;
               return (
                 <button
@@ -228,28 +249,30 @@ export default function BillingPage() {
             })}
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            {(["QR", "PHONE"] as Method[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMethod(m)}
-                style={{
-                  flex: 1,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  padding: "9px 0",
-                  borderRadius: 9,
-                  background: method === m ? "var(--text)" : "var(--soft)",
-                  color: method === m ? "#fff" : "var(--muted)",
-                  border: "1px solid var(--border)",
-                }}
-              >
-                {m === "QR" ? "QR-код Kaspi" : "По номеру телефона"}
-              </button>
-            ))}
-          </div>
+          {methods.length > 1 && (
+            <div style={{ display: "flex", gap: 8 }}>
+              {methods.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMethod(m)}
+                  style={{
+                    flex: 1,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    padding: "9px 0",
+                    borderRadius: 9,
+                    background: method === m ? "var(--text)" : "var(--soft)",
+                    color: method === m ? "#fff" : "var(--muted)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  {m === "QR" ? "QR-код Kaspi" : "По номеру телефона"}
+                </button>
+              ))}
+            </div>
+          )}
 
           {method === "PHONE" && (
             <input
@@ -291,12 +314,12 @@ export default function BillingPage() {
               opacity: busy ? 0.6 : 1,
             }}
           >
-            {busy ? "Создаём счёт…" : `Оплатить ${PLANS[plan].amount.toLocaleString("ru-RU")} ₸`}
+            {busy ? "Создаём счёт…" : `Оплатить ${cfg.plans[plan].amount.toLocaleString("ru-RU")} ₸`}
           </button>
         </div>
       )}
 
-      {!invoice && paidActive && !trialOver && (
+      {!invoice && paidActive && !timedOver && cfg && (
         <div style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ fontSize: 14, color: "var(--muted)" }}>
             Доступ активен. Продлить можно в любой момент — новый период добавится к текущему.
@@ -316,7 +339,7 @@ export default function BillingPage() {
               fontFamily: "inherit",
             }}
           >
-            Продлить: {PLANS[plan].label} — {PLANS[plan].amount.toLocaleString("ru-RU")} ₸
+            Продлить: {cfg.plans[plan].label} — {cfg.plans[plan].amount.toLocaleString("ru-RU")} ₸
           </button>
           <Link href="/" style={{ fontSize: 13, color: "var(--muted)", textAlign: "center" }}>← На дашборд</Link>
         </div>

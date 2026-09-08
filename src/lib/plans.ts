@@ -1,22 +1,33 @@
-// Тарифы подписки на платформу. Суммы — целые тенге (ApiPay дробных не принимает).
-// Меняются здесь и больше нигде. Если годовой тариф не нужен — убрать YEARLY.
+// Метаданные тарифов. Цены и длина триала — в БД (AppConfig), редактируются
+// из /admin; здесь только неизменяемая часть + значения по умолчанию.
 
 import type { PlanId } from "@prisma/client";
 
-export interface Plan {
+export interface PlanMeta {
   id: PlanId;
   label: string;
-  amount: number; // тенге
   days: number; // на сколько продлевает доступ
 }
 
-export const PLANS: Record<PlanId, Plan> = {
-  MONTHLY: { id: "MONTHLY", label: "Месяц", amount: 5000, days: 30 },
-  YEARLY: { id: "YEARLY", label: "Год", amount: 50000, days: 365 },
+export const PLAN_META: Record<PlanId, PlanMeta> = {
+  MONTHLY: { id: "MONTHLY", label: "Месяц", days: 30 },
+  YEARLY: { id: "YEARLY", label: "Год", days: 365 },
 };
 
-export const TRIAL_DAYS = 3;
+export const DEFAULT_MONTHLY_PRICE = 5000;
+export const DEFAULT_YEARLY_PRICE = 50000;
+export const DEFAULT_TRIAL_DAYS = 3;
 
-export function getPlan(id: string): Plan | null {
-  return (PLANS as Record<string, Plan>)[id] ?? null;
+// Разделы сайдбара, которые можно закрывать плашкой «Скоро».
+export const TOGGLEABLE_SECTIONS: { key: string; label: string }[] = [
+  { key: "webinars", label: "Вебинары" },
+  { key: "leads", label: "CRM / Лиды" },
+  { key: "analytics", label: "Аналитика" },
+  { key: "redirects", label: "Link Preview" },
+  { key: "entry-forms", label: "Формы входа" },
+  { key: "agent", label: "Настройки агента" },
+];
+
+export function isPlanId(v: string): v is PlanId {
+  return v === "MONTHLY" || v === "YEARLY";
 }

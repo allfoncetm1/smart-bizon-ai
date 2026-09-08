@@ -46,7 +46,7 @@ function dedupeKeyFor(body: WebhookBody): string {
 export async function POST(req: NextRequest) {
   const raw = await req.text();
 
-  if (!verifyWebhookSignature(raw, req.headers.get("x-webhook-signature"))) {
+  if (!(await verifyWebhookSignature(raw, req.headers.get("x-webhook-signature")))) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 

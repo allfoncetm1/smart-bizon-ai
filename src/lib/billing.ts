@@ -1,9 +1,11 @@
 // Логика подписки: создание счёта, зачёт оплаты, вычисление доступа для токена.
-// Продление — ручное (клиент сам оплачивает новый счёт), автозакрытия доступа нет.
+// Продление — ручное (клиент сам оплачивает новый счёт), автозакрытия платной
+// подписки нет. Триал и выданный вручную доступ (COMP) истекают по trialEndsAt.
 
 import type { AccessVia, PayMethod, PlanId, Subscription } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { PLANS, TRIAL_DAYS, getPlan } from "@/lib/plans";
+import { PLAN_META } from "@/lib/plans";
+import { getPlans, getTrialDays } from "@/lib/app-config";
 import { createPhoneInvoice, createQrInvoice, normalizeKzPhone } from "@/lib/apipay";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -13,30 +15,32 @@ function addDays(base: Date, days: number): Date {
 }
 
 /** accessVia + trialEndsAt для JWT (строчные значения, как ждёт middleware).
- *  Истёкший триал не «чиним» — middleware по этим полям уведёт на /billing. */
+ *  TRIAL и COMP ограничены по времени (trialEndsAt); истёкшие не «чиним». */
 export function resolveAccess(sub: Subscription | null): {
-  accessVia: "trial" | "paid" | "admin";
+  accessVia: "trial" | "paid" | "admin" | "comp";
   trialEndsAt: number | null;
 } {
   if (!sub) return { accessVia: "trial", trialEndsAt: 0 };
   if (sub.accessVia === "ADMIN") return { accessVia: "admin", trialEndsAt: null };
   if (sub.accessVia === "PAID") return { accessVia: "paid", trialEndsAt: null };
-  return {
-    accessVia: "trial",
-    trialEndsAt: sub.trialEndsAt ? Math.floor(sub.trialEndsAt.getTime() / 1000) : 0,
-  };
+  const ends = sub.trialEndsAt ? Math.floor(sub.trialEndsAt.getTime() / 1000) : 0;
+  return { accessVia: sub.accessVia === "COMP" ? "comp" : "trial", trialEndsAt: ends };
 }
 
-/** Активен ли триал прямо сейчас (по данным подписки). */
-export function isTrialActive(sub: Subscription | null, now: Date = new Date()): boolean {
-  return !!sub && sub.accessVia === "TRIAL" && !!sub.trialEndsAt && sub.trialEndsAt > now;
+/** Активен ли ограниченный по времени доступ (триал или выданный вручную). */
+export function isTimedAccessActive(sub: Subscription | null, now: Date = new Date()): boolean {
+  return (
+    !!sub &&
+    (sub.accessVia === "TRIAL" || sub.accessVia === "COMP") &&
+    !!sub.trialEndsAt &&
+    sub.trialEndsAt > now
+  );
 }
 
-/** При входе: у обычного юзера без подписки заводим триал на TRIAL_DAYS дней. */
+/** При входе: у обычного юзера без подписки заводим триал на trialDays дней. */
 export async function ensureSubscription(userId: string, isAdmin: boolean): Promise<Subscription> {
   const existing = await prisma.subscription.findUnique({ where: { userId } });
   if (existing) {
-    // Админам, получившим доступ вручную до этой фичи, фиксируем ADMIN.
     if (isAdmin && existing.accessVia === "TRIAL") {
       return prisma.subscription.update({
         where: { userId },
@@ -45,14 +49,31 @@ export async function ensureSubscription(userId: string, isAdmin: boolean): Prom
     }
     return existing;
   }
+  const trialDays = isAdmin ? 0 : await getTrialDays();
   return prisma.subscription.create({
     data: {
       userId,
       status: isAdmin ? "ACTIVE" : "TRIALING",
       accessVia: isAdmin ? "ADMIN" : "TRIAL",
-      trialEndsAt: isAdmin ? null : addDays(new Date(), TRIAL_DAYS),
+      trialEndsAt: isAdmin ? null : addDays(new Date(), trialDays),
     },
   });
+}
+
+/** Ручная выдача доступа на N дней (accessVia = COMP, истекает без крона). */
+export async function grantComp(userId: string, days: number): Promise<void> {
+  const now = new Date();
+  const sub = await prisma.subscription.findUnique({ where: { userId } });
+  const base = sub?.trialEndsAt && sub.trialEndsAt > now ? sub.trialEndsAt : now;
+  const trialEndsAt = addDays(base, days);
+  await prisma.$transaction([
+    prisma.subscription.upsert({
+      where: { userId },
+      create: { userId, status: "TRIALING", accessVia: "COMP", trialEndsAt },
+      update: { status: "TRIALING", accessVia: "COMP", trialEndsAt },
+    }),
+    prisma.user.update({ where: { id: userId }, data: { hasAccess: true } }),
+  ]);
 }
 
 export interface CheckoutResult {
@@ -70,7 +91,8 @@ export async function startCheckout(params: {
   method: PayMethod;
   phone?: string;
 }): Promise<CheckoutResult> {
-  const plan = getPlan(params.plan);
+  const plans = await getPlans();
+  const plan = plans[params.plan];
   if (!plan) throw new Error("Неизвестный тариф");
 
   let phone: string | null = null;
@@ -142,13 +164,13 @@ export async function applyPaidInvoice(paymentId: string, invoice: ApiPayInvoice
   });
   if (!payment || payment.status === "PAID") return;
 
-  const plan = PLANS[payment.plan];
+  const days = PLAN_META[payment.plan].days;
   const now = new Date();
   const base =
     payment.subscription.currentPeriodEnd && payment.subscription.currentPeriodEnd > now
       ? payment.subscription.currentPeriodEnd
       : now;
-  const currentPeriodEnd = addDays(base, plan.days);
+  const currentPeriodEnd = addDays(base, days);
   const nextAccessVia: AccessVia = payment.subscription.accessVia === "ADMIN" ? "ADMIN" : "PAID";
 
   await prisma.$transaction([

@@ -10,7 +10,7 @@ const PUBLIC = ["/login", "/r/", "/j/", "/api/auth/", "/api/payments/", "/api/og
 interface JWTClaims {
   hasAccess: boolean;
   isAdmin: boolean;
-  accessVia?: "trial" | "paid" | "admin";
+  accessVia?: "trial" | "paid" | "admin" | "comp";
   trialEndsAt?: number | null;
 }
 
@@ -55,14 +55,15 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // Триал истёк — доступ закрыт, пока не оплатят. Проверка — по времени в токене,
-  // без обращения к БД (middleware работает на Edge).
-  const trialExpired =
-    payload.accessVia === "trial" &&
+  // Триал / выданный вручную доступ истёк — закрыто, пока не оплатят. Проверка
+  // по времени в токене, без обращения к БД (middleware работает на Edge).
+  const timeLimited = payload.accessVia === "trial" || payload.accessVia === "comp";
+  const timedExpired =
+    timeLimited &&
     typeof payload.trialEndsAt === "number" &&
     payload.trialEndsAt > 0 &&
     payload.trialEndsAt * 1000 < Date.now();
-  const denied = !payload.hasAccess || trialExpired;
+  const denied = !payload.hasAccess || timedExpired;
 
   if (denied) {
     // Саму страницу оплаты и её API всегда оставляем доступными.

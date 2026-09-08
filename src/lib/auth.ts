@@ -13,8 +13,8 @@ export interface SessionPayload {
   isAdmin: boolean;
   hasAccess: boolean;
   // Как получен доступ. Отсутствует в старых токенах — тогда считаем полный доступ.
-  accessVia?: "trial" | "paid" | "admin";
-  // Unix-секунды окончания триала (только при accessVia === "trial").
+  accessVia?: "trial" | "paid" | "admin" | "comp";
+  // Unix-секунды окончания доступа (при accessVia "trial" или "comp").
   trialEndsAt?: number | null;
   exp: number;
 }

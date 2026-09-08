@@ -275,6 +275,25 @@ model WebhookEvent {
   receivedAt DateTime @default(now())
 }
 
+// Глобальные настройки, редактируемые из /admin. Всегда одна строка (id = "singleton").
+model AppConfig {
+  id           String   @id @default("singleton")
+  monthlyPrice Int      @default(5000) // тенге
+  yearlyPrice  Int      @default(50000) // тенге
+  trialDays    Int      @default(3)
+  // ключи разделов сайта, которые сейчас «Скоро» (закрыты для не-админов)
+  sectionsOff  String[] @default(["webinars", "leads", "analytics"])
+
+  // Платёжная система (ApiPay). Непустое значение здесь перекрывает переменную
+  // окружения — можно менять ключи из админки без деплоя.
+  payMethods          String[] @default(["QR", "PHONE"]) // способы оплаты на /billing
+  apipayApiBase       String   @default("")
+  apipayApiKey        String   @default("")
+  apipayWebhookSecret String   @default("")
+
+  updatedAt DateTime @updatedAt
+}
+
 enum SubscriptionStatus {
   TRIALING
   ACTIVE
@@ -286,6 +305,7 @@ enum AccessVia {
   TRIAL
   PAID
   ADMIN
+  COMP // выдан админом вручную на срок (истекает по trialEndsAt, без крона)
 }
 
 enum PlanId {

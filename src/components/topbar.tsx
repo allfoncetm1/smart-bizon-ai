@@ -12,6 +12,7 @@ const screenTitles: Record<string, string> = {
   "/entry-forms": "Формы входа",
   "/agent": "Настройки агента",
   "/billing": "Подписка",
+  "/admin": "Админка",
   "/settings": "Настройки",
 };
 

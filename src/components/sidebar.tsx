@@ -1,10 +1,19 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const navItems = [
+interface NavItem {
+  key: string;
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const navItems: NavItem[] = [
   {
+    key: "dashboard",
     href: "/",
     label: "Дашборд",
     icon: (
@@ -15,6 +24,7 @@ const navItems = [
     ),
   },
   {
+    key: "webinars",
     href: "/webinars",
     label: "Вебинары",
     icon: (
@@ -24,6 +34,7 @@ const navItems = [
     ),
   },
   {
+    key: "leads",
     href: "/leads",
     label: "CRM / Лиды",
     icon: (
@@ -34,6 +45,7 @@ const navItems = [
     ),
   },
   {
+    key: "analytics",
     href: "/analytics",
     label: "Аналитика",
     icon: (
@@ -43,6 +55,7 @@ const navItems = [
     ),
   },
   {
+    key: "redirects",
     href: "/redirects",
     label: "Link Preview",
     icon: (
@@ -53,6 +66,7 @@ const navItems = [
     ),
   },
   {
+    key: "entry-forms",
     href: "/entry-forms",
     label: "Формы входа",
     icon: (
@@ -62,6 +76,7 @@ const navItems = [
     ),
   },
   {
+    key: "agent",
     href: "/agent",
     label: "Настройки агента",
     icon: (
@@ -71,6 +86,7 @@ const navItems = [
     ),
   },
   {
+    key: "billing",
     href: "/billing",
     label: "Подписка",
     icon: (
@@ -80,6 +96,7 @@ const navItems = [
     ),
   },
   {
+    key: "settings",
     href: "/settings",
     label: "Настройки",
     icon: (
@@ -91,8 +108,53 @@ const navItems = [
   },
 ];
 
+const adminItem: NavItem = {
+  key: "admin",
+  href: "/admin",
+  label: "Админка",
+  icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+    </svg>
+  ),
+};
+
+const linkBase: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 11,
+  padding: "10px 12px",
+  borderRadius: 10,
+  fontSize: 14,
+  textDecoration: "none",
+  transition: "all 0.15s",
+};
+
+function SoonPill() {
+  return (
+    <span style={{ marginLeft: "auto", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.03em", color: "var(--amber)", background: "var(--amberbg)", padding: "2px 7px", borderRadius: 20 }}>
+      СКОРО
+    </span>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
+  const [sectionsOff, setSectionsOff] = useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.sectionsOff) setSectionsOff(d.sectionsOff); })
+      .catch(() => {});
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.realIsAdmin || d?.isAdmin) setIsAdmin(true); })
+      .catch(() => {});
+  }, []);
+
+  const items = isAdmin ? [...navItems, adminItem] : navItems;
 
   return (
     <aside style={{ width: 262, flexShrink: 0, background: "var(--card)", borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", padding: "20px 16px", position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 40 }}>
@@ -112,28 +174,35 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        {navItems.map((item) => {
+        {items.map((item) => {
           const active = pathname === item.href;
+          const soon = sectionsOff.includes(item.key);
+
+          // Закрытый раздел для не-админа — не ссылка, приглушённый, с плашкой «Скоро».
+          if (soon && !isAdmin) {
+            return (
+              <div key={item.key} style={{ ...linkBase, color: "#b6b5c2", fontWeight: 500, cursor: "default" }}>
+                {item.icon}
+                {item.label}
+                <SoonPill />
+              </div>
+            );
+          }
+
           return (
             <Link
-              key={item.href}
+              key={item.key}
               href={item.href}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 11,
-                padding: "10px 12px",
-                borderRadius: 10,
-                fontSize: 14,
+                ...linkBase,
                 fontWeight: active ? 600 : 500,
                 color: active ? "var(--accent)" : "var(--muted)",
                 background: active ? "color-mix(in srgb, var(--accent) 11%, transparent)" : "transparent",
-                textDecoration: "none",
-                transition: "all 0.15s",
               }}
             >
               {item.icon}
               {item.label}
+              {soon && isAdmin && <SoonPill />}
             </Link>
           );
         })}
